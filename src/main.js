@@ -275,6 +275,8 @@ function says(t) {
   return t.replace(/Press E and make/g, 'Open your Bag and make').replace(/\(E\)/g, '(Bag)')
     .replace(/Walk to the ship and press F/g, 'Walk to the ship and tap Ship').replace(/press F and take off/g, 'tap Ship and take off')
     .replace(/Hold left click to dig by hand/g, 'Hold Dig to dig by hand').replace(/Press F to open the ship/g, 'Tap Ship to open it')
+    .replace(/Press E to open your bag/g, 'Tap Bag (top right)').replace(/Open your bag \(E\)/g, 'Tap Bag (top right)')
+    .replace(/hold left click on it/g, 'hold Dig').replace(/and press F to fit it/g, 'and tap Ship to fit it').replace(/press F and take off/g, 'tap Ship and take off')
     .replace(/right click or F/g, 'tap Ship').replace(/\(1 to 9\)/g, '(tap a slot at the bottom)').replace(/Walk up to the ship first/g, 'Walk up to the ship first');
 }
 function nextTip() {
@@ -289,17 +291,110 @@ function nextTip() {
     if (!c.ok) return `Wave ${n} needs the ${Object.values(ITEMS).find(i => i.weapon === c.need).name}. Make it at your Forge.`;
     return `Start wave ${n} at the Wave beacon next to the ship. Fly to other worlds from the ship's star map.`;
   }
-  if (t < 1) return has('rock') >= 4 ? 'You have enough rock. Press E and make a Rock pickaxe.' : `Pick up rock: the grey blocks lying around. Hold left click to dig by hand. (${has('rock')}/4)`;
+  return says(stepNow().text);
+}
+// ---- the next step before the ship is fixed: one clear thing to do, and where it is
+const RAW = { rock: B.ROCK, stone: B.STONE, iron: B.IRON, ice: B.ICE, crystal: B.CRYSTAL };
+const RAW_WORDS = {
+  rock: 'grey Rock blocks lying on the ground',
+  stone: 'Dark stone (just under the ground, use your pickaxe)',
+  iron: 'Iron: dark stone with silver specks, a few blocks down',
+  ice: 'Ice: pale blue blocks',
+  crystal: 'Purple crystal: it glows, deep down or in craters',
+};
+// what raw blocks are still missing to make an item (Metal sheets come from Iron)
+function missingFor(need) {
+  const out = {};
+  let sheetsShort = Math.max(0, (need.sheet || 0) - has('sheet'));
+  for (const [k, n] of Object.entries(need)) {
+    if (k === 'sheet') continue;
+    const short = n - has(k); if (short > 0) out[k] = short;
+  }
+  if (sheetsShort > 0) { const ironShort = sheetsShort - has('iron'); if (ironShort > 0) out.iron = ironShort; }
+  return out;
+}
+function stepNow() {
+  const f = state.fixed, t = toolTier();
+  const make = (name) => ({ text: `Open your bag (E) and press Make next to ${name}.`, bag: true });
+  const dig = (k, n, why) => ({ text: `Dig ${n} more ${RAW_WORDS[k]}. ${why} Follow the arrow at the top.`, block: RAW[k], label: ITEMS[k].name });
+  if (t < 1) return has('rock') >= 4 ? make('Rock pickaxe') : { ...dig('rock', 4 - has('rock'), 'You need 4 to make a pickaxe.'), text: `Dig 4 grey Rock blocks lying around (${has('rock')} of 4). Walk up to one and hold left click on it. Follow the arrow at the top.` };
   const ready = PARTS.find(p => !f[p.id] && has(p.id) > 0);
-  if (ready) return `Your ${ready.name.toLowerCase()} is ready. Walk to the ship and press F.`;
-  if (PARTS.every(p => f[p.id])) return 'Everything is fixed! Go to the ship, press F and take off.';
-  if (t < 2) return `Make an Iron drill (E) so you can dig purple crystal. Iron is the dark stone with silver specks, under the ${look.planet.surface.under.toLowerCase()}.`;
-  const needIce = !f.fueltank && has('fueltank') === 0 && has('ice') < 6;
-  if (needIce) return look.terrain.iceShell ? 'Find ice: it is right under the snow. Dig down a few blocks.'
-    : look.terrain.sea ? 'Find ice: the flat, pale blue frozen sea in the low ground.' : 'Find ice: pale blue blocks in the bottom of craters.';
-  const needCrystal = (!f.fueltank && !has('fueltank') ? 1 : 0) + (!f.computer && !has('computer') ? 3 : 0);
-  if (has('crystal') < needCrystal) return 'Find purple crystal. It glows. Look in craters, or dig deep, about 14 blocks below the ship.';
-  return 'Open your bag (E) and make the ship parts.';
+  if (ready) return { text: `Your ${ready.name} is made! Walk to the ship (follow the arrow) and press F to fit it.`, ship: true };
+  if (PARTS.every(p => f[p.id])) return { text: 'Everything is fixed! Walk to the ship, press F and take off.', ship: true };
+  const part = PARTS.find(p => !f[p.id]);
+  const r = RECIPES.find(x => x.out === part.id);
+  const miss = missingFor(r.need);
+  // crystal needs the Iron drill first
+  if (miss.crystal || (r.need.crystal && t < 2)) {
+    if (t < 2) {
+      const dm = missingFor(RECIPES.find(x => x.out === 'drill').need);
+      const k = Object.keys(dm)[0];
+      if (k) return dig(k, dm[k], `It is for an Iron drill, which digs Purple crystal.`);
+      if (has('sheet') < 2) return make('Metal sheet');
+      return make('Iron drill');
+    }
+  }
+  const k = ['rock', 'stone', 'iron', 'ice', 'crystal'].find(x => miss[x]);
+  if (k) return dig(k, miss[k], `It is for the ${part.name} (part ${PARTS.indexOf(part) + 1} of 4).`);
+  if ((r.need.sheet || 0) > has('sheet')) return make('Metal sheet');
+  return make(part.name);
+}
+// find the nearest block of a kind around you (checked once a second)
+let wayT = 0, wayTarget = null, wayFor = null;
+function findNear(id) {
+  const px = Math.floor(player.pos.x), py = Math.floor(player.pos.y), pz = Math.floor(player.pos.z);
+  let best = null, bd = 1e9;
+  for (let r = 0; r <= 28 && !best; r += 4) {
+    for (let x = px - r - 4; x <= px + r + 4; x++) for (let z = pz - r - 4; z <= pz + r + 4; z++) {
+      if (Math.max(Math.abs(x - px), Math.abs(z - pz)) < r - 0) continue;
+      for (let y = Math.max(1, py - 22); y <= py + 8; y++) {
+        if (world.get(x, y, z) !== id) continue;
+        const open = world.get(x, y + 1, z) === B.AIR;
+        if (id === B.ROCK && !open) continue;                       // loose rocks: the ones you can see
+        const d = Math.hypot(x - px, z - pz) + Math.abs(y - py) * 1.5 + (open ? 0 : 5);
+        if (d < bd) { bd = d; best = { x: x + 0.5, y, z: z + 0.5 }; }
+      }
+    }
+  }
+  return best;
+}
+const wayMark = (() => {
+  const g = new THREE.Group();
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(0.18, 14, 0.18), new THREE.MeshBasicMaterial({ color: 0xffe070, transparent: true, opacity: 0.35, depthWrite: false }));
+  beam.position.y = 7.5; g.add(beam);
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64; const x = c.getContext('2d');
+  x.fillStyle = '#ffd040'; x.strokeStyle = '#1a0905'; x.lineWidth = 5;
+  x.beginPath(); x.moveTo(12, 14); x.lineTo(52, 14); x.lineTo(32, 52); x.closePath(); x.stroke(); x.fill();
+  const arrow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+  arrow.scale.set(1.1, 1.1, 1); g.add(arrow); g.userData.arrow = arrow;
+  g.visible = false; scene.add(g); return g;
+})();
+function updateWay(dt) {
+  const box = $('compass');
+  if (!playing || state.won || inCamp) { wayMark.visible = false; return false; }
+  const st = stepNow();
+  wayT -= dt;
+  const key = st.block || (st.ship ? 'ship' : 'bag');
+  if (wayT <= 0 || key !== wayFor || (st.block && wayTarget && world.get(Math.floor(wayTarget.x), wayTarget.y, Math.floor(wayTarget.z)) !== st.block)) {
+    wayT = 1; wayFor = key;
+    wayTarget = st.block ? findNear(st.block) : st.ship ? { x: SHIP_CENTER.x, y: SHIP_BASE, z: SHIP_CENTER.z } : null;
+  }
+  $('hint').classList.toggle('big', !!st.bag);
+  if (st.bag) { if (!panelOpen()) $('hint').textContent = says('Press E to open your bag'); }
+  if (!wayTarget) { wayMark.visible = false; box.classList.add('hide'); return true; }
+  const d = new THREE.Vector3(wayTarget.x - player.pos.x, 0, wayTarget.z - player.pos.z);
+  const dist = d.length();
+  box.classList.remove('hide');
+  box.querySelector('span').textContent = st.ship ? 'Ship' : st.label;
+  let rel = Math.atan2(-d.x, -d.z) - player.yaw; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+  box.querySelector('.arrow').style.transform = `rotate(${-rel}rad)`;
+  const dy = wayTarget.y - Math.floor(player.pos.y);
+  $('shipDist').textContent = `${Math.round(dist)} m${dy < -1 ? `, ${-dy} down` : dy > 2 ? `, ${dy} up` : ''}`;
+  wayMark.visible = !st.ship && dist > 1.2;
+  wayMark.userData.arrow.visible = dist > 3;
+  wayMark.position.set(wayTarget.x, wayTarget.y + 1, wayTarget.z);
+  wayMark.userData.arrow.position.y = 0.9 + Math.abs(Math.sin(clock.elapsedTime * 3)) * 0.5;
+  return true;
 }
 function renderGoal() {
   if (inCamp) {
@@ -318,7 +413,7 @@ function renderGoal() {
     $('goal').innerHTML = `<h3>${look.planet.name}: wave ${done} of ${LAST_WAVE}</h3><ul><li>Stage: ${st.name} (waves ${st.from} to ${st.to})</li><li>Weapon: ${adv.weapon().name}</li></ul><div class="tip">${says(nextTip())}</div>`;
     return;
   }
-  $('goal').innerHTML = `<h3>Fix your ship</h3><ul>${items}</ul><div class="tip">${says(nextTip())}</div>`;
+  $('goal').innerHTML = `<h3>Fix your ship</h3><ul>${items}</ul><div class="tip next"><b>Next:</b> ${says(nextTip())}</div>`;
 }
 
 // ---------------- bag and crafting ----------------
@@ -1475,10 +1570,11 @@ function frame() {
 
   // hud
   if (playing) {
+    const guided = updateWay(dt);
     const d = SHIP_CENTER.clone().sub(camera.position); d.y = 0;
     const dist = d.length();
-    $('compass').classList.toggle('hide', dist < 7);
-    if (dist >= 7) {
+    if (!guided) { $('compass').classList.toggle('hide', dist < 7); $('compass').querySelector('span').textContent = 'Ship'; }
+    if (!guided && dist >= 7) {
       let rel = Math.atan2(-d.x, -d.z) - player.yaw; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
       $('compass').querySelector('.arrow').style.transform = `rotate(${-rel}rad)`;
       $('shipDist').textContent = `${Math.round(dist)} m`;
@@ -1487,7 +1583,7 @@ function frame() {
     $('depth').classList.toggle('hide', below < 2);
     $('depth').textContent = `${below} blocks down`;
     const hint = $('hint');
-    hint.textContent = nearShip() && launchT < 0 && !panelOpen() ? says('Press F to open the ship') : '';
+    if (!hint.classList.contains('big') || panelOpen()) hint.textContent = nearShip() && launchT < 0 && !panelOpen() ? says('Press F to open the ship') : '';
     if (TOUCH) $('tShip').classList.toggle('far', !nearShip());
     goalTimer -= dt; if (goalTimer <= 0) { goalTimer = 0.5; renderGoal(); }
     renderStatus();

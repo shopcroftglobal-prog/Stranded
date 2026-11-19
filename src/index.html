@@ -46,6 +46,9 @@ button:disabled { opacity: 0.45; cursor: default; }
 #goal li.done { color: var(--ok); }
 #goal .tip { color: var(--muted); border-top: 1px solid #4a2416; padding-top: 6px; }
 #compass { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 4px 12px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.tip.next { color: #ffe9a8; font-size: 14px; border-left: 3px solid #ffd040; padding-left: 8px; }
+#hint.big { font-size: 22px; color: #ffd040; animation: pulse 1s infinite alternate; }
+@keyframes pulse { from { opacity: 0.6; } to { opacity: 1; } }
 #compass .arrow { display: inline-block; width: 18px; text-align: center; color: #ffd7b0; }
 #depth { position: absolute; top: 46px; right: 12px; padding: 4px 10px; font-size: 14px; color: var(--muted); }
 #toasts { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }

@@ -1,0 +1,32 @@
+const { chromium } = require('playwright');
+const path = require('path');
+(async () => {
+  const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  const errs = []; page.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
+  await page.goto('file://' + path.resolve(__dirname, '../dist/play.html') + '?desktop&shot'); await page.waitForTimeout(800);
+  await page.evaluate(() => { localStorage.clear(); }); await page.reload(); await page.waitForTimeout(1000);
+  await page.evaluate(() => document.getElementById('playBtn').click()); await page.waitForTimeout(1500);
+  await page.evaluate(() => { __game.profile.guide = 9; });
+  const tip = () => page.evaluate(() => [document.querySelector('#goal .tip').textContent, document.getElementById('compass').textContent, document.getElementById('hint').textContent]);
+  await page.waitForTimeout(1500);
+  console.log('1', JSON.stringify(await tip()));
+  // face the target
+  await page.evaluate(() => { const g = __game; const m = g.scene.children.find(c => c.type === 'Group' && c.children.length === 2 && c.userData.arrow); const p = g.player.pos; g.player.yaw = Math.atan2(-(m.position.x - p.x), -(m.position.z - p.z)); g.player.pitch = -0.25; });
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: 'shots/way_rock.png' });
+  await page.evaluate(() => __game.give('rock', 4)); await page.waitForTimeout(1200);
+  console.log('2', JSON.stringify(await tip()));
+  await page.screenshot({ path: 'shots/way_bag.png' });
+  await page.evaluate(() => __game.make('pickaxe')); await page.waitForTimeout(1500);
+  console.log('3', JSON.stringify(await tip()));
+  await page.evaluate(() => __game.give('iron', 3)); await page.waitForTimeout(1200);
+  console.log('4', JSON.stringify(await tip()));
+  await page.evaluate(() => { __game.make('sheet'); __game.make('sheet'); __game.make('sheet'); }); await page.waitForTimeout(1200);
+  console.log('5', JSON.stringify(await tip()));
+  await page.evaluate(() => __game.make('patch')); await page.waitForTimeout(1200);
+  console.log('6', JSON.stringify(await tip()));
+  await page.evaluate(() => { __game.give('ice', 6); __game.give('stone', 6); __game.give('iron', 5); }); await page.waitForTimeout(1200);
+  console.log('7', JSON.stringify(await tip()));
+  console.log('ERR', errs.join('\n') || 'none'); await browser.close();
+})();
