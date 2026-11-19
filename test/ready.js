@@ -1,0 +1,42 @@
+const { chromium } = require('playwright');
+const path = require('path');
+(async () => {
+  const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  const errs = []; page.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
+  await page.goto('file://' + path.resolve(__dirname, '../dist/play.html') + '?desktop&shot'); await page.waitForTimeout(800);
+  await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(1000);
+  await page.evaluate(() => document.getElementById('playBtn').click()); await page.waitForTimeout(800);
+  await page.screenshot({ path: 'shots/guide_1.png' });
+  const g = () => page.evaluate(() => __game.profile.guide || 0);
+  await page.evaluate(() => { __game.player.yaw += 2; }); await page.waitForTimeout(400);
+  await page.evaluate(() => { __game.player.pos.x += 5; }); await page.waitForTimeout(400);
+  await page.keyboard.down('Space'); await page.waitForFunction(() => (__game.profile.guide||0) >= 3, null, { timeout: 30000 }).catch(()=>{}); await page.keyboard.up('Space');
+  console.log('GUIDE after look/walk/jump', await g());
+  await page.evaluate(() => { __game.state.stats.mined = 1; }); await page.waitForFunction(() => __game.profile.guide >= 4, null, { timeout: 30000 }).catch(()=>{});
+  await page.evaluate(() => { __game.openPanel('bag'); }); await page.waitForFunction(() => __game.profile.guide >= 5, null, { timeout: 30000 }).catch(()=>{});
+  await page.evaluate(() => { __game.closePanels(); __game.state.stats.placed = 1; }); await page.waitForFunction(() => __game.profile.guide >= 6, null, { timeout: 30000 }).catch(()=>{});
+  console.log('GUIDE end', await g());
+  await page.screenshot({ path: 'shots/guide_done.png' });
+  // quests: push progress on today's quests and claim
+  await page.evaluate(() => { __game.openPanel('bookPanel'); __game.closePanels(); });
+  const q = await page.evaluate(() => { const g = __game; const d = g.profile.daily; return d ? d.quests.map(q => [q.id, q.need]) : null; });
+  console.log('QUESTS', JSON.stringify(q));
+  await page.evaluate(() => { const g = __game; for (const q of g.profile.daily.quests) for (let i = 0; i < q.need; i++) g.adv && 0; });
+  await page.evaluate(() => { for (const q of __game.profile.daily.quests) __game.quests.track(q.id, q.need); });
+  await page.evaluate(() => { __game.openPanel('bookPanel'); }); await page.waitForTimeout(300);
+  await page.screenshot({ path: 'shots/quests.png' });
+  const c0 = await page.evaluate(() => __game.profile.coins);
+  await page.evaluate(() => { for (const b of document.querySelectorAll('#bookList .quest button')) if (!b.disabled) b.click(); });
+  await page.evaluate(() => { for (const b of document.querySelectorAll('#bookList .quest button')) if (!b.disabled) b.click(); });
+  await page.evaluate(() => { for (const b of document.querySelectorAll('#bookList .quest button')) if (!b.disabled) b.click(); });
+  console.log('COINS', c0, '->', await page.evaluate(() => __game.profile.coins), 'badges', await page.evaluate(() => JSON.stringify(Object.keys(__game.profile.badges || {}))));
+  await page.evaluate(() => document.querySelector('#bookTabs button[data-w=_badges]').click()); await page.waitForTimeout(200);
+  await page.screenshot({ path: 'shots/badges.png' });
+  // settings
+  await page.evaluate(() => { __game.closePanels(); __game.openPanel('setPanel'); }); await page.waitForTimeout(200);
+  await page.evaluate(() => document.querySelector('#setBody button[data-q=low]').click());
+  await page.screenshot({ path: 'shots/settings.png' });
+  console.log('SETTINGS', await page.evaluate(() => localStorage.getItem('stranded-settings-v1')));
+  console.log('ERR', errs.join('\n') || 'none'); await browser.close();
+})();

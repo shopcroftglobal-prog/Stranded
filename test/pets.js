@@ -1,0 +1,30 @@
+const { chromium } = require('playwright');
+const path = require('path');
+(async () => {
+  const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  const errs = []; page.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
+  await page.goto('file://' + path.resolve(__dirname, '../dist/play.html') + '?desktop&shot'); await page.waitForTimeout(800);
+  await page.evaluate(() => { localStorage.clear(); }); await page.reload(); await page.waitForTimeout(1000);
+  await page.evaluate(() => document.getElementById('playBtn').click()); await page.waitForTimeout(800);
+  await page.evaluate(() => { const p = __game.profile; p.guide = 9; p.book.mars = Object.assign(p.book.mars || {}, { hopper: true, puff: true }); });
+  await page.evaluate(() => __game.openPanel('bookPanel'));
+  await page.evaluate(() => document.querySelector('#bookTabs button[data-w=_pets]').click()); await page.waitForTimeout(200);
+  await page.screenshot({ path: 'shots/pets_book.png' });
+  await page.evaluate(() => { for (const b of document.querySelectorAll('#bookList .quest button')) if (!b.disabled) { b.click(); break; } });
+  await page.evaluate(() => __game.closePanels());
+  // walk away; the pet should follow
+  await page.evaluate(() => { __game.player.yaw = 0; });
+  await page.keyboard.down('KeyW'); await page.waitForTimeout(3000); await page.keyboard.up('KeyW');
+  await page.waitForTimeout(1500);
+  const r = await page.evaluate(() => { const p = __game.pets.pet, me = __game.player.pos; return { kind: p && p.kind, d: p ? Math.hypot(p.pos.x - me.x, p.pos.z - me.z).toFixed(2) : null, badge: !!(__game.profile.badges || {}).pet }; });
+  console.log('PET', JSON.stringify(r));
+  const ice0 = await page.evaluate(() => __game.state.inv.ice || 0);
+  await page.evaluate(() => { __game.profile.petT = 149.9; });
+  await page.waitForFunction(() => (__game.profile.petT || 0) < 1, null, { timeout: 20000 });
+  console.log('ICE', ice0, '->', await page.evaluate(() => __game.state.inv.ice || 0));
+  await page.evaluate(() => { const p = __game.pets.pet.pos, pl = __game.player; pl.yaw = Math.atan2(-(p.x - pl.pos.x), -(p.z - pl.pos.z)); pl.pitch = -0.4; });
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: 'shots/pet.png' });
+  console.log('ERR', errs.join('\n') || 'none'); await browser.close();
+})();

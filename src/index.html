@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Stranded</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0606; --panel: rgba(24, 12, 10, 0.92); --edge: #6e2d18; --edge-hi: #c4562a;
+  --text: #f3e6dc; --muted: #c4a898; --ok: #7be39a; --warn: #ffb070; --glow: #c58bff;
+  --font: 'Pixelify Sans', ui-monospace, 'Cascadia Mono', Menlo, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0b0606; } }
+:root[data-theme="dark"] { --bg: #0b0606; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; font-variant-ligatures: none; background: var(--bg); color: var(--text); font-family: var(--font); }
+canvas#view { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.hide { display: none !important; }
+button { font: inherit; color: var(--text); background: #3a1a10; border: 2px solid var(--edge-hi); padding: 8px 16px; cursor: pointer; box-shadow: inset -2px -2px 0 #1e0c07, inset 2px 2px 0 #8a3a1e; }
+button:hover:not(:disabled) { background: #5a2614; }
+button:disabled { opacity: 0.45; cursor: default; }
+.panel { background: var(--panel); border: 2px solid var(--edge); box-shadow: 0 0 0 2px #1a0905, 0 10px 40px rgba(0,0,0,0.6); }
+
+/* HUD */
+#hud { position: fixed; inset: 0; pointer-events: none; }
+#cross { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; transform: translate(-50%, -50%); }
+#cross::before, #cross::after { content: ''; position: absolute; background: rgba(255,255,255,0.85); mix-blend-mode: difference; }
+#cross::before { left: 8px; top: 0; width: 2px; height: 18px; }
+#cross::after { top: 8px; left: 0; height: 2px; width: 18px; }
+#target { position: absolute; left: 50%; top: calc(50% + 22px); transform: translateX(-50%); font-size: 15px; text-shadow: 0 2px 0 #000; white-space: nowrap; }
+#target .need { color: var(--warn); }
+#hotbar { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 4px; }
+.slot { width: 54px; height: 54px; position: relative; background: rgba(20,10,8,0.75); border: 2px solid #4a2416; display: grid; place-items: center; }
+.slot.sel { border-color: #ffd7b0; box-shadow: 0 0 0 2px #c4562a; }
+.slot img { width: 40px; height: 40px; image-rendering: pixelated; }
+.slot .n { position: absolute; right: 3px; bottom: 1px; font-size: 14px; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; }
+.slot .k { position: absolute; left: 3px; top: 1px; font-size: 11px; color: var(--muted); }
+#tool { position: absolute; bottom: 82px; left: 50%; transform: translateX(-50%); font-size: 14px; color: var(--muted); text-shadow: 0 2px 0 #000; }
+#goal { position: absolute; top: 12px; left: 12px; width: min(330px, calc(100vw - 24px)); padding: 10px 12px; font-size: 14px; line-height: 1.35; }
+#goal h3 { margin: 0 0 6px; font-size: 16px; color: #ffd7b0; font-weight: 600; }
+#goal ul { list-style: none; padding: 0; margin: 0 0 6px; }
+#goal li { padding: 1px 0; }
+#goal li.done { color: var(--ok); }
+#goal .tip { color: var(--muted); border-top: 1px solid #4a2416; padding-top: 6px; }
+#compass { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 4px 12px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+#compass .arrow { display: inline-block; width: 18px; text-align: center; color: #ffd7b0; }
+#depth { position: absolute; top: 46px; right: 12px; padding: 4px 10px; font-size: 14px; color: var(--muted); }
+#toasts { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.toast { background: rgba(20,10,8,0.85); border: 1px solid #6e2d18; padding: 4px 12px; font-size: 15px; animation: fade 2.6s forwards; }
+@keyframes fade { 0%, 75% { opacity: 1 } 100% { opacity: 0; transform: translateY(-8px) } }
+#hint { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); font-size: 16px; color: #ffd7b0; text-shadow: 0 2px 0 #000; }
+
+/* overlays */
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(8,3,2,0.55); padding: 16px; }
+.dialog { width: min(820px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow: auto; padding: 18px 20px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.dialog h2 { margin: 0 0 4px; font-size: 26px; color: #ffd7b0; font-weight: 600; }
+.dialog .sub { color: var(--muted); margin: 0 0 14px; }
+.close { float: right; padding: 2px 10px; }
+#title { background: radial-gradient(ellipse at 50% 120%, rgba(74,34,22,0.6), rgba(5,2,2,0.85)); }
+#title .dialog { width: min(900px, 100%); text-align: center; }
+.pick { display: grid; grid-template-columns: 210px 1fr; gap: 14px; text-align: left; margin: 14px 0 4px; }
+@media (max-width: 640px) { .pick { grid-template-columns: 1fr; } #facts { min-height: 0; } #worlds { display: grid !important; grid-template-columns: 1fr 1fr; } }
+#worlds { display: flex; flex-direction: column; gap: 6px; }
+.world { display: flex; align-items: center; gap: 10px; padding: 6px 8px; text-align: left; background: rgba(60,25,14,0.35); border-color: #4a2416; box-shadow: none; }
+.world.on { border-color: #ffd7b0; background: #5a2614; }
+.world .sw { position: relative; width: 34px; height: 34px; flex: none; border: 2px solid #1a0905; image-rendering: pixelated; }
+.world .sw i { position: absolute; width: 6px; height: 6px; right: 6px; top: 6px; }
+.world .nm { flex: 1; font-size: 16px; }
+.world .sv { font-size: 11px; color: var(--ok); }
+#facts { padding: 10px 14px; background: rgba(20,10,8,0.6); border: 1px solid #4a2416; min-height: 290px; }
+#facts h3 { margin: 0 0 2px; font-size: 22px; color: #ffd7b0; font-weight: 600; }
+#facts .blurb { margin: 0 0 10px; color: var(--muted); }
+#facts dl { display: grid; grid-template-columns: 96px 1fr; gap: 5px 12px; margin: 0; font-size: 14px; line-height: 1.35; }
+#facts dt { color: #ffd7b0; }
+#facts dd { margin: 0; }
+#world { position: absolute; top: 12px; right: 12px; padding: 4px 10px; font-size: 14px; display: flex; gap: 10px; }
+#world #worldTemp { color: var(--muted); }
+details.help { margin-top: 10px; color: var(--muted); font-size: 14px; }
+details.help summary { cursor: pointer; }
+#title h1 { font-size: clamp(34px, 7vw, 56px); margin: 0; color: #e0703a; letter-spacing: 2px; text-shadow: 0 4px 0 #3a1408; font-weight: 600; }
+#title .btns { display: flex; gap: 10px; justify-content: center; margin: 18px 0; flex-wrap: wrap; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; text-align: left; font-size: 14px; margin: 0 auto; width: fit-content; }
+.keys b { color: #ffd7b0; font-weight: 400; }
+/* bag */
+.bag { display: grid; grid-template-columns: 1fr 1.3fr; gap: 16px; }
+@media (max-width: 720px) { .bag { grid-template-columns: 1fr; } }
+.bag h4 { margin: 0 0 8px; color: #ffd7b0; font-weight: 400; font-size: 17px; }
+.inv { display: grid; grid-template-columns: repeat(auto-fill, 58px); gap: 4px; }
+.inv .slot { cursor: default; pointer-events: auto; }
+.recipes { display: flex; flex-direction: column; gap: 6px; }
+.recipe { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; background: rgba(60,25,14,0.35); border: 1px solid #4a2416; }
+.recipe img { width: 40px; height: 40px; image-rendering: pixelated; }
+.recipe .nm { font-size: 16px; }
+.recipe .needs { font-size: 13px; color: var(--muted); }
+.recipe .needs .have { color: var(--ok); } .recipe .needs .miss { color: var(--warn); }
+.recipe .note { font-size: 12px; color: #9a8072; }
+.recipe.part { border-color: #8a3a1e; }
+/* ship */
+.parts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (max-width: 560px) { .parts { grid-template-columns: 1fr; } }
+.shippart { padding: 10px; border: 1px solid #4a2416; background: rgba(60,25,14,0.35); display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; }
+.shippart img { width: 40px; height: 40px; image-rendering: pixelated; }
+.shippart .st { font-size: 13px; color: var(--warn); }
+.shippart.fixed .st { color: var(--ok); }
+.shippart button { margin-top: 6px; padding: 4px 10px; }
+#launchBtn { margin-top: 14px; width: 100%; font-size: 22px; padding: 12px; background: #5a2614; }
+#win h1 { font-size: clamp(30px, 6vw, 48px); color: #ffd7b0; margin: 0 0 6px; }
+#lockmsg { position: fixed; left: 50%; bottom: 40%; transform: translateX(-50%); padding: 10px 16px; font-size: 16px; pointer-events: none; }
+/* ---------- phones and tablets ---------- */
+body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.touch-only { display: none; }
+.touch .touch-only { display: block; }
+.touch .desk-only { display: none !important; }
+#touch { position: fixed; inset: 0; pointer-events: none; display: none; }
+.touch #touch.on { display: block; }
+.touch #hotbar { pointer-events: auto; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+.touch .slot { cursor: pointer; }
+#stick { position: absolute; width: 128px; height: 128px; margin: -64px 0 0 -64px; border-radius: 50%;
+  left: calc(92px + env(safe-area-inset-left, 0px)); top: calc(100% - 170px - env(safe-area-inset-bottom, 0px));
+  background: rgba(20,10,8,0.35); border: 2px solid rgba(255,215,176,0.35); }
+#stick.on { border-color: rgba(255,215,176,0.7); }
+#knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(255,215,176,0.4); border: 2px solid #ffd7b0; }
+.tbtn { position: absolute; pointer-events: auto; touch-action: none; width: 70px; height: 70px; border-radius: 50%; padding: 0;
+  background: rgba(40,16,10,0.62); border: 2px solid rgba(255,215,176,0.6); color: #ffd7b0; font-size: 15px; box-shadow: none; display: grid; place-items: center; }
+.tbtn.on { background: rgba(196,86,42,0.85); }
+.tbtn:hover:not(:disabled) { background: rgba(40,16,10,0.62); }
+.tbtn.on:hover { background: rgba(196,86,42,0.85); }
+#tDig { width: 84px; height: 84px; right: calc(18px + env(safe-area-inset-right, 0px)); bottom: calc(170px + env(safe-area-inset-bottom, 0px)); font-size: 17px; }
+#tJump { right: calc(18px + env(safe-area-inset-right, 0px)); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+#tPlace { right: calc(108px + env(safe-area-inset-right, 0px)); bottom: calc(118px + env(safe-area-inset-bottom, 0px)); }
+#tmenu { position: absolute; top: calc(8px + env(safe-area-inset-top, 0px)); right: calc(8px + env(safe-area-inset-right, 0px)); display: flex; gap: 6px; pointer-events: auto; }
+#tmenu button { padding: 6px 12px; font-size: 15px; min-width: 56px; touch-action: none; }
+#tmenu #tShip.far { opacity: 0.5; }
+.touch #world, .touch #tool, .touch #lockmsg { display: none !important; }
+.touch #goal { width: min(250px, 52vw); font-size: 12px; padding: 7px 9px; pointer-events: auto; top: calc(8px + env(safe-area-inset-top, 0px)); left: calc(8px + env(safe-area-inset-left, 0px)); }
+.touch #goal h3 { font-size: 14px; margin-bottom: 3px; }
+.touch #goal h3::after { content: '  ▾'; color: var(--muted); font-size: 11px; }
+.touch #goal:not(.open) ul { display: none; }
+.touch #goal:not(.open) .tip { border-top: 0; padding-top: 0; }
+.touch #goal.open h3::after { content: '  ▴'; }
+.touch #depth { top: calc(52px + env(safe-area-inset-top, 0px)); }
+.touch #toasts { bottom: auto; top: 26%; }
+.touch #hint { bottom: auto; top: 34%; }
+.touch .close { padding: 6px 14px; }
+@media (orientation: portrait) {
+  #tmenu { flex-direction: column; top: calc(110px + env(safe-area-inset-top, 0px)); }
+  .touch #compass { left: auto; right: calc(8px + env(safe-area-inset-right, 0px)); transform: none; top: calc(8px + env(safe-area-inset-top, 0px)); }
+  .touch #depth { top: calc(48px + env(safe-area-inset-top, 0px)); }
+  #stick { top: calc(100% - 190px - env(safe-area-inset-bottom, 0px)); }
+  #tDig { bottom: calc(190px + env(safe-area-inset-bottom, 0px)); }
+  #tJump { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  #tPlace { bottom: calc(138px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 480px) {
+  .slot { width: 38px; height: 38px; } .slot img { width: 28px; height: 28px; } .slot .k { display: none; } .slot .n { font-size: 12px; }
+  #hotbar { gap: 2px; padding: 2px; }
+}
+@media (max-height: 480px) {
+  .slot { width: 42px; height: 42px; } .slot img { width: 30px; height: 30px; } .slot .k { display: none; }
+  .touch #goal { font-size: 11px; }
+  #stick { top: calc(100% - 140px - env(safe-area-inset-bottom, 0px)); width: 112px; height: 112px; margin: -56px 0 0 -56px; }
+  .tbtn { width: 60px; height: 60px; font-size: 13px; }
+  #tDig { width: 72px; height: 72px; bottom: calc(132px + env(safe-area-inset-bottom, 0px)); }
+  #tJump { bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
+  #tPlace { right: calc(94px + env(safe-area-inset-right, 0px)); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
+  .dialog { padding: 12px 14px; }
+  .dialog h2 { font-size: 21px; }
+  #title h1 { font-size: 30px; }
+}
+.touch #title .btns { position: sticky; bottom: -18px; margin: 10px -20px -18px; padding: 10px; background: #1a0c09; border-top: 1px solid var(--edge); z-index: 1; }
+/* ---------- adventure ---------- */
+#bars { position: absolute; top: 46px; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: auto 120px auto 120px; gap: 4px 8px; align-items: center; padding: 5px 10px; font-size: 13px; }
+#bars .bar { height: 10px; background: #1a0905; border: 1px solid #4a2416; position: relative; }
+#bars .bar i { position: absolute; inset: 0; width: 100%; display: block; }
+#hpFill { background: #e0503a; } #hpFill.low { background: #ff2a1a; animation: blink 0.6s infinite; }
+#airFill { background: #6ac8f0; } #airFill.low { background: #f0c24a; animation: blink 0.6s infinite; }
+@keyframes blink { 50% { opacity: 0.45 } }
+#bars .meta { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+#coins { color: #f0c24a; }
+#waveBox { position: absolute; top: 98px; left: 50%; transform: translateX(-50%); padding: 5px 14px; font-size: 16px; color: #ffd7b0; white-space: nowrap; }
+#lostBox { position: absolute; top: 140px; left: 50%; transform: translateX(-50%); padding: 4px 12px; font-size: 14px; color: #f0c24a; }
+.hpbar { display: inline-block; width: 70px; height: 8px; background: #1a0905; border: 1px solid #6e2d18; vertical-align: middle; position: relative; }
+.hpbar.big { width: 180px; height: 12px; }
+.hpbar i { position: absolute; inset: 0; background: #e0503a; display: block; }
+#banner { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); text-align: center; animation: bannerIn 3.6s forwards; pointer-events: none; }
+#banner .bt { font-size: clamp(30px, 6vw, 52px); color: #ffd7b0; text-shadow: 0 4px 0 #3a1408; font-weight: 600; }
+#banner .bs { font-size: 17px; color: var(--text); text-shadow: 0 2px 0 #000; max-width: 80vw; }
+@keyframes bannerIn { 0% { opacity: 0; transform: translate(-50%, 10px) } 10%, 80% { opacity: 1; transform: translate(-50%, 0) } 100% { opacity: 0 } }
+#hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(200,20,10,0.65)); }
+.stages { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.stage { display: flex; flex-direction: column; padding: 6px 10px; border: 1px solid #4a2416; background: rgba(60,25,14,0.35); font-size: 13px; color: var(--muted); }
+.stage b { color: var(--text); font-weight: 400; font-size: 15px; }
+.stage.done b { color: var(--ok); } .stage.now { border-color: var(--edge-hi); }
+.stage .rw { color: #f0c24a; }
+.wbar { height: 14px; background: #1a0905; border: 1px solid #6e2d18; margin: 6px 0 10px; position: relative; }
+.wbar i { position: absolute; inset: 0; background: linear-gradient(90deg, #c4562a, #f0c24a); display: block; }
+.warn { color: var(--warn); } .good { color: var(--ok); } .big { font-size: 22px; color: #f0c24a; margin: 4px 0; }
+.recipe small { color: var(--muted); font-size: 12px; }
+.recipe .dot { width: 24px; height: 24px; border-radius: 50%; margin: 0 8px; box-shadow: 0 0 10px currentColor; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
+.cols h4 { margin: 0 0 8px; color: #ffd7b0; font-weight: 400; font-size: 17px; }
+#mapCanvas { width: 100%; max-width: 360px; aspect-ratio: 1; image-rendering: pixelated; border: 1px solid #4a2416; display: block; margin: 0 auto; }
+.btns2 { display: flex; flex-direction: column; gap: 4px; } .btns2 button { padding: 4px 10px; }
+.recipe.legend { border-color: #d8a020; background: linear-gradient(90deg, rgba(120,70,10,0.45), rgba(60,25,14,0.35)); box-shadow: 0 0 10px rgba(255,190,60,0.25) inset; }
+.recipe.legend .nm { color: #ffd060; }
+.rigbtns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; } .rigbtns button { flex: 1 1 200px; }
+.adbtn { background: #2a5a3a; border-color: #4aa060; }
+.treasure { margin: 10px 0; padding: 8px; border: 1px solid #d8a020; background: rgba(120,70,10,0.25); }
+.treasure .inv { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.tcell { display: flex; flex-direction: column; align-items: center; width: 74px; text-align: center; font-size: 11px; line-height: 1.2; }
+.tcell i { color: #ffd060; font-style: normal; font-size: 10px; }
+.slot.super { box-shadow: 0 0 8px #7de8ff; } .slot.legend { box-shadow: 0 0 10px #ffd060; border-color: #ffd060; }
+.slot.unseen img { filter: brightness(0) opacity(0.5); }
+.lucky { color: #ffd060; font-size: 13px; margin: 6px 0 0; }
+.boost { color: #7dff9a; }
+.gift { width: 100%; margin: 10px 0; background: #6a3a8a; border-color: #b070e0; font-size: 16px; padding: 10px; }
+#homeName { margin-left: 8px; font: inherit; background: #1e0e08; color: #f4e2c8; border: 1px solid #8a3a1e; padding: 4px 8px; width: 200px; }
+.homebar { height: 10px; margin: 6px 0; background: #1a0905; border: 1px solid #4a2416; position: relative; } .homebar i { position: absolute; left: 0; top: 0; bottom: 0; display: block; background: linear-gradient(90deg, #e08a2c, #ffd060); }
+.hl { margin-top: 10px; }
+.perk { padding: 6px 8px; margin: 4px 0; border: 1px solid #4a2416; opacity: 0.55; display: grid; grid-template-columns: auto 1fr; column-gap: 8px; }
+.perk span { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
+.perk.on { opacity: 1; border-color: #d8a020; background: rgba(120,70,10,0.25); }
+#homeCosy { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; font-size: 13px; }
+.cosy { display: flex; justify-content: space-between; color: var(--muted); } .cosy.got { color: var(--ok); }
+#homeTag { margin-top: 4px; font-size: 12px; color: #ffd060; text-align: center; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; } .tabs button.on { background: #8a3a1e; border-color: #e08a2c; }
+.family, .plan { margin: 8px 0; padding: 8px; border: 1px solid #4a2416; background: rgba(60,25,14,0.25); }
+.plan .nm { font-size: 17px; color: #ffd060; } .plan .note { font-size: 13px; color: var(--muted); margin: 2px 0 6px; } .plan .needs { font-size: 13px; margin: 6px 0; }
+.plan .needs .have, .family .needs .have { color: var(--ok); } .plan .needs .miss { color: var(--warn); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.chip { width: 30px; height: 30px; padding: 0; border: 2px solid #1a0905; min-width: 0; }
+.chip.on { outline: 3px solid #ffd060; outline-offset: 1px; }
+.buildbtn { width: 100%; margin-bottom: 8px; background: linear-gradient(90deg, #e04060, #ff8040, #ffd040, #4ac060, #4ab0f0, #9a5ae0); color: #1a0905; font-weight: 700; border-color: #ffd060; }
+.undo { width: 100%; margin: 6px 0; }
+#race { position: fixed; inset: 0; z-index: 50; pointer-events: none; font-family: inherit; color: #f4e2c8; }
+#race.hide { display: none; }
+#race .overlay, #race button, #race #rTouch { pointer-events: auto; }
+#rHud .rbox { position: absolute; background: rgba(26,9,5,0.75); border: 2px solid #8a3a1e; padding: 4px 10px; font-size: 18px; }
+#rPos { top: 10px; left: 10px; font-size: 26px !important; color: #ffd060; }
+#rLap { top: 56px; left: 10px; } #rTime { top: 92px; left: 10px; }
+#rPow { top: 10px; right: 10px; text-align: center; min-width: 140px; } #rPow span { display: block; font-size: 11px; color: var(--muted); }
+#rMap { position: absolute; right: 10px; bottom: 10px; background: rgba(26,9,5,0.5); border: 2px solid #8a3a1e; }
+#rBig { position: absolute; top: 30%; width: 100%; text-align: center; font-size: 96px; color: #ffd060; text-shadow: 4px 4px 0 #1a0905; }
+#rMsg { position: absolute; top: 18%; width: 100%; text-align: center; font-size: 28px; color: #fff; text-shadow: 3px 3px 0 #1a0905; }
+.rquit { position: absolute; top: 132px; left: 10px; font-size: 12px; padding: 4px 8px; }
+#rTouch { display: none; } #race.touch #rTouch { display: block; } #race.touch #rMap { bottom: auto; top: 70px; width: 100px; height: 100px; }
+#rTouch .rl { position: absolute; left: 12px; bottom: 16px; display: flex; gap: 10px; }
+#rTouch .rr { position: absolute; right: 12px; bottom: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#rTouch button { width: 76px; height: 64px; font-size: 18px; background: rgba(60,25,14,0.7); }
+#rTouch .rgas { background: rgba(40,120,60,0.8); } #rTouch .ruse { background: rgba(120,60,160,0.8); }
+.rpw { display: grid; grid-template-columns: 18px 130px 1fr; gap: 8px; align-items: center; font-size: 13px; margin: 3px 0; }
+.rpw i { width: 16px; height: 16px; display: block; border: 1px solid #000; } .rpw span { color: var(--muted); }
+.rres { display: grid; grid-template-columns: 44px 18px 1fr auto; gap: 8px; align-items: center; padding: 4px 6px; border-bottom: 1px solid #4a2416; text-align: left; }
+.rres i { width: 14px; height: 14px; display: block; } .rres.me { background: rgba(255,208,96,0.15); color: #ffd060; }
+#race h3 { margin: 12px 0 6px; font-size: 16px; color: #ffd7b0; }
+.racebtn { background: linear-gradient(90deg, #4ab0f0, #9a5ae0); border-color: #c890ff; color: #fff; }
+#tChat { display: none; } .camp #tChat { display: block; }
+.campbtn { background: linear-gradient(90deg, #4ac060, #4ab0f0); border-color: #a0f0c0; color: #0a1a10; font-weight: 700; }
+#friendsBox { margin: 6px 0; font-size: 13px; } #friendsBox b { color: #7dff9a; } #friendsBox div { color: #f4e2c8; } #friendsBox span { color: var(--muted); }
+#chatLog { position: absolute; left: 12px; bottom: 120px; font-size: 14px; background: rgba(26,9,5,0.6); padding: 6px 10px; max-width: 320px; pointer-events: none; }
+.chatlist { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#guide { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); background: rgba(26,9,5,0.85); border: 2px solid #ffd060; padding: 8px 16px; text-align: center; font-size: 17px; max-width: min(520px, 90vw); pointer-events: none; }
+#guide small { display: block; color: #ffd060; font-size: 12px; }
+#bookList .quest { grid-column: 1 / -1; }
+.quest { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 6px 8px; border: 1px solid #4a2416; margin: 4px 0; }
+.quest .qbar { width: 90px; height: 8px; background: #1a0905; border: 1px solid #4a2416; position: relative; } .quest .qbar i { position: absolute; left: 0; top: 0; bottom: 0; background: #7dff9a; }
+.quest.done { border-color: #7dff9a; } .badge { display: grid; grid-template-columns: 34px 1fr; gap: 8px; align-items: center; padding: 4px; opacity: 0.45; } .badge.got { opacity: 1; }
+.badge i { width: 30px; height: 30px; display: grid; place-items: center; background: #3a2a1a; border: 2px solid #8a6a3a; font-style: normal; color: #ffd060; } .badge.got i { background: #8a5a10; border-color: #ffd060; }
+.setrow { display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: center; margin: 10px 0; } .setrow input { width: 100%; }
+.setrow > div { display: flex; flex-wrap: wrap; gap: 6px; } .setrow button { padding: 4px 10px; flex: 1; } .setrow button.on { background: #8a3a1e; border-color: #e08a2c; }
+.adcount { font-size: 64px; margin: 16px 0; color: #ffd060; }
+
+#bookTabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+#bookTabs button { padding: 4px 10px; font-size: 14px; }
+#bookTabs button.on { background: #5a2614; border-color: #ffd7b0; }
+#bookList { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
+.entry { padding: 6px 10px; border: 1px dashed #4a2416; display: flex; flex-direction: column; font-size: 12px; color: var(--muted); }
+.entry b { font-size: 15px; font-weight: 400; color: #6a5048; }
+.entry.got { border-style: solid; background: rgba(60,25,14,0.35); } .entry.got b { color: var(--text); }
+#travel { background: radial-gradient(ellipse at center, #120a1e, #000); }
+#travelText { font-size: 30px; color: #ffd7b0; text-align: center; line-height: 1.5; animation: bannerIn 2.4s forwards; }
+.world .lk { font-size: 11px; color: var(--muted); }
+#tScan { right: calc(108px + env(safe-area-inset-right, 0px)); bottom: calc(196px + env(safe-area-inset-bottom, 0px)); width: 58px; height: 58px; font-size: 13px; }
+.touch #bars { top: auto; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); grid-template-columns: auto 70px auto 70px; font-size: 11px; padding: 3px 7px; }
+.touch #waveBox { top: calc(8px + env(safe-area-inset-top, 0px)); font-size: 14px; }
+.touch #lostBox { top: calc(44px + env(safe-area-inset-top, 0px)); }
+@media (orientation: portrait) { #tScan { bottom: calc(222px + env(safe-area-inset-bottom, 0px)); } .touch #bars { bottom: calc(52px + env(safe-area-inset-bottom, 0px)); } }
+@media (max-height: 480px) { #tScan { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); right: calc(92px + env(safe-area-inset-right, 0px)); width: 50px; height: 50px; } }
+#tRover { display: none; right: calc(108px + env(safe-area-inset-right, 0px)); bottom: calc(262px + env(safe-area-inset-bottom, 0px)); width: 58px; height: 58px; font-size: 13px; } .hasrover #tRover { display: block; }
+@media (orientation: portrait) { #tRover { bottom: calc(288px + env(safe-area-inset-bottom, 0px)); } }
+#tFly { display: none; } .free #tFly { display: block; }
+#freeBtn.on, #freeBtn2.on { background: #2e6a4a; border-color: var(--ok); }
+#fps { position: fixed; right: 12px; bottom: 12px; font-size: 12px; color: var(--muted); pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="hud" class="hide">
+  <div id="cross"></div>
+  <div id="target"></div>
+  <div id="goal" class="panel"></div>
+  <div id="compass" class="panel"><span>Ship</span><span class="arrow">↑</span><span id="shipDist"></span></div>
+  <div id="world" class="panel"><span id="worldName"></span><span id="worldTemp"></span></div>
+  <div id="depth" class="panel"></div>
+  <div id="toasts"></div>
+  <div id="hint"></div>
+  <div id="chatLog" class="hide"></div>
+  <div id="guide" class="hide"></div>
+  <div id="tool"></div>
+  <div id="hotbar"></div>
+  <div id="bars" class="panel"><span>Health</span><div class="bar"><i id="hpFill"></i></div><span>Air</span><div class="bar"><i id="airFill"></i></div>
+    <div class="meta"><span id="daytime"></span><span id="coins"></span></div><div id="homeTag" class="hide"></div></div>
+  <div id="waveBox" class="panel hide"></div>
+  <div id="lostBox" class="panel hide"></div>
+  <div id="banner" class="hide"></div>
+</div>
+<div id="hurt"></div>
+
+<div id="touch">
+  <div id="stick"><div id="knob"></div></div>
+  <button class="tbtn" id="tDig">Dig</button>
+  <button class="tbtn" id="tJump">Jump</button>
+  <button class="tbtn" id="tPlace">Use</button>
+  <button class="tbtn" id="tScan">Scan</button>
+  <button class="tbtn" id="tRover">Drive</button>
+  <div id="tmenu"><button id="tBag">Bag</button><button id="tBook">Book</button><button id="tChat">Say</button><button id="tFly">Fly</button><button id="tShip" class="far">Ship</button><button id="tPause">II</button></div>
+</div>
+
+<div id="lockmsg" class="panel hide">Click to look around</div>
+
+<div id="title" class="overlay">
+  <div class="dialog panel">
+    <h1>Stranded</h1>
+    <p class="sub">Your ship came down hard on Mars. Fix it, beat 50 waves and a dragon on every world, and fly to real stars.</p>
+    <p class="sub" id="titleCoins" style="color:#f0c24a"></p>
+    <div id="friendsBox"></div>
+    <div class="pick">
+      <div id="worlds"></div>
+      <div id="facts"></div>
+    </div>
+    <div class="btns">
+      <button id="playBtn">Play</button>
+      <button id="newBtn" class="hide">Start over</button>
+      <button id="raceBtn" class="racebtn">Star Kart racing</button>
+      <button id="campBtn" class="campbtn">Friends' camp</button>
+      <button id="setBtn">Settings</button>
+      <button id="freeBtn" title="No air loss, no night creatures, and you can fly. Good for building.">Free roam: off</button>
+    </div>
+    <details class="help touch-only"><summary>How to play on a phone</summary><div class="keys" style="margin-top:8px">
+      <b>Move</b><span>Left thumb on the round pad</span>
+      <b>Look</b><span>Drag anywhere on the right</span>
+      <b>Dig</b><span>Hold the Dig button</span>
+      <b>Place block</b><span>Tap Place. Tap a slot at the bottom to pick a block</span>
+      <b>Bag and crafting</b><span>Bag, top right</span>
+      <b>Ship repairs</b><span>Ship, when you're next to it</span>
+      <b>Hit a creature</b><span>Hold Dig while aiming at it</span>
+      <b>Use things</b><span>Aim at a beacon, Forge, box, bed or the Trader and tap Use</span>
+      <b>Tip</b><span>Turn your phone sideways for more room</span>
+    </div></details>
+    <details class="help desk-only"><summary>Keys</summary><div class="keys" style="margin-top:8px">
+      <b>Move</b><span>W A S D, Space to jump, Shift to run</span>
+      <b>Look</b><span>Mouse</span>
+      <b>Dig</b><span>Hold left click</span>
+      <b>Place block</b><span>Right click</span>
+      <b>Pick block</b><span>1 to 9, or mouse wheel</span>
+      <b>Bag and crafting</b><span>E</span>
+      <b>Ship and star map</b><span>F near the ship</span>
+      <b>Use (beacon, Forge, box, bed, Trader)</b><span>Right click</span>
+      <b>Hit a creature</b><span>Left click</span>
+      <b>Scanner</b><span>Q</span>
+      <b>Collection book</b><span>B</span>
+      <b>Pause</b><span>Esc</span>
+    </div></details>
+  </div>
+</div>
+
+<div id="bag" class="overlay hide">
+  <div class="dialog panel">
+    <button class="close" data-close>Close (E)</button>
+    <h2>Bag</h2>
+    <p class="sub" id="bagTool"></p>
+    <div class="bag">
+      <div><h4>What you have</h4><div class="inv" id="inv"></div></div>
+      <div><h4>Make</h4><div class="recipes" id="recipes"></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="shipPanel" class="overlay hide">
+  <div class="dialog panel">
+    <button class="close" data-close>Close (F)</button>
+    <h2>Your ship</h2>
+    <p class="sub" id="shipSub">Make each part in your bag (E), then fit it here.</p>
+    <div class="parts" id="parts"></div>
+    <button id="launchBtn" class="hide">Take off</button>
+  </div>
+</div>
+
+<div id="pause" class="overlay hide">
+  <div class="dialog panel" style="width:min(460px,100%);text-align:center">
+    <h2>Paused</h2>
+    <p class="sub">Your game saves by itself.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;max-width:260px;margin:0 auto 14px">
+      <button id="resumeBtn">Keep playing</button>
+      <button id="restartBtn">Start over</button>
+      <button id="worldBtn">Pick another world</button>
+      <button id="freeBtn2">Free roam: off</button>
+      <button id="raceBtn2" class="racebtn">Star Kart racing</button>
+      <button id="setBtn2">Settings</button>
+    </div>
+    <div class="keys desk-only">
+      <b>Dig</b><span>Hold left click</span>
+      <b>Place</b><span>Right click</span>
+      <b>Bag</b><span>E</span>
+      <b>Ship</b><span>F</span>
+    </div>
+    <button id="fullBtn" class="touch-only" style="margin:12px auto 0">Full screen</button>
+  </div>
+</div>
+
+<div id="win" class="overlay hide">
+  <div class="dialog panel" style="width:min(520px,100%);text-align:center">
+    <h1 id="winTitle">You made it off Mars!</h1>
+    <p class="sub" id="winStats"></p>
+    <p>Your ship can fly now. Make fuel cells (4 ice + 1 purple crystal) and pick a world on the star map. Or land again and fight the waves at the Wave beacon.</p>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button id="mapBtn">Open the star map</button><button id="stayBtn">Land again</button></div>
+  </div>
+</div>
+
+<div id="beaconPanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close</button>
+  <h2 id="beaconTitle">Wave beacon</h2>
+  <p class="sub">Light the beacon to call the next wave. Beat all creatures to win coins and a chest. Every 10 waves a big one comes. Wave 50 is the dragon.</p>
+  <div id="beaconBody"></div>
+</div></div>
+<div id="forgePanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close</button>
+  <h2>Forge</h2>
+  <p class="sub">Weapons and shields. You keep them on every world.</p>
+  <div class="recipes" id="forgeList"></div>
+</div></div>
+<div id="boxPanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close</button>
+  <h2>Storage box</h2>
+  <p class="sub">Click something to move it. Things in boxes are safe if you fall.</p>
+  <div class="cols"><div><h4>Your bag</h4><div class="inv" id="boxBag"></div></div><div><h4>In the box</h4><div class="inv" id="boxIn"></div></div></div>
+</div></div>
+<div id="shopPanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close</button>
+  <h2>The Trader</h2>
+  <p class="sub" id="shopCoins"></p>
+  <div class="cols"><div><h4>Sell</h4><div class="recipes" id="shopSell"></div></div><div><h4>Buy</h4><div class="recipes" id="shopBuy"></div></div></div>
+</div></div>
+<div id="mapPanel" class="overlay hide"><div class="dialog panel" style="width:min(960px,100%)">
+  <button class="close" id="mapClose">Close</button>
+  <h2>Star map</h2>
+  <p class="sub">Real stars, at their real distances and directions from the Sun.</p>
+  <div class="cols"><div><canvas id="mapCanvas"></canvas><p class="sub" id="mapShip" style="margin-top:8px"></p><h4>Ship upgrades</h4><div class="recipes" id="mapUp"></div></div>
+  <div><h4>Worlds</h4><div class="recipes" id="mapList"></div></div></div>
+</div></div>
+<div id="bookPanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close (B)</button>
+  <h2>Collection book</h2>
+  <p class="sub" id="bookSum"></p>
+  <div id="bookTabs"></div>
+  <div id="bookList"></div>
+</div></div>
+ <div id="setPanel" class="overlay hide"><div class="dialog panel" style="width:min(460px,100%)">
+  <button class="close" data-close>Close</button>
+  <h2>Settings</h2>
+  <div id="setBody"></div>
+  <p class="sub">"Fast" helps on older phones. "Far view" shows more of the world.</p>
+</div></div>
+ <div id="chatPanel" class="overlay hide"><div class="dialog panel" style="width:min(460px,100%)">
+  <button class="close" data-close>Close (T)</button>
+  <h2>Say something</h2>
+  <div id="chatList" class="chatlist"></div>
+</div></div>
+ <div id="giftPanel" class="overlay hide"><div class="dialog panel" style="width:min(520px,100%)">
+  <button class="close" data-close>Close</button>
+  <h2 id="giftTitle">Give a gift</h2>
+  <p class="sub">Pick something from your bag. It goes straight to their bag.</p>
+  <div id="giftList" class="recipes"></div>
+</div></div>
+ <div id="buildPanel" class="overlay hide"><div class="dialog panel" style="width:min(700px,100%)">
+  <button class="close" data-close>Close (K)</button>
+  <h2>Build</h2>
+  <p class="sub">Make bright blocks in any colour, or build a whole castle tower, wall, gate or house in one go.</p>
+  <div id="buildTabs" class="tabs"></div>
+  <div id="buildList"></div>
+</div></div>
+ <div id="homePanel" class="overlay hide"><div class="dialog panel" style="width:min(620px,100%)">
+  <button class="close" data-close>Close</button>
+  <h2>Home</h2>
+  <label class="sub">Name your home <input id="homeName" maxlength="24" placeholder="Your home"></label>
+  <div id="homeLevel"></div>
+  <button id="homeGift" class="gift">Open today's gift</button>
+  <h3>Home levels</h3>
+  <div id="homePerks"></div>
+  <h3>What makes it cosy <small class="sub">(near the flag)</small></h3>
+  <div id="homeCosy"></div>
+</div></div>
+ <div id="rigPanel" class="overlay hide"><div class="dialog panel" style="width:min(560px,100%)">
+  <button class="close" data-close>Close</button>
+  <h2>Mining rig</h2>
+  <div id="rigBody"></div>
+  <div class="rigbtns"><button id="rigTake">Take everything</button><button id="rigAd" class="adbtn">Watch an ad</button></div>
+</div></div>
+<div id="adPanel" class="overlay hide"><div class="dialog panel" style="width:min(420px,100%);text-align:center">
+  <h2>Ad break</h2>
+  <p class="sub">A real ad plays here once the game is online. Thanks for keeping the game free!</p>
+  <div id="adCount" class="adcount">15</div>
+  <button id="adSkip" class="ghost">Close without the boost</button>
+</div></div>
+<div id="fallPanel" class="overlay hide"><div class="dialog panel" style="width:min(460px,100%);text-align:center">
+  <h2 id="fallMsg">You fell</h2>
+  <p class="sub" id="fallSub"></p>
+  <button id="fallOk">Get up</button>
+</div></div>
+<div id="rewardPanel" class="overlay hide"><div class="dialog panel" style="width:min(520px,100%);text-align:center">
+  <h2 id="rewTitle"></h2>
+  <div id="rewBody"></div>
+  <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px"><button id="rewNext">Next wave</button><button id="rewClose">Keep exploring</button></div>
+</div></div>
+<div id="travel" class="overlay hide"><div id="travelText"></div></div>
+<div id="fps"></div>
+</body>
+</html>
