@@ -16,7 +16,7 @@ jobs:
         with: { node-version: 20 }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
-      - uses: android-actions/setup-android@v3
+      # the GitHub runner already has the Android SDK (ANDROID_HOME)
       - name: Make the app project
         run: |
           mkdir app && cd app
