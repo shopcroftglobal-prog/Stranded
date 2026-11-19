@@ -1201,6 +1201,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyQ') adv.scan();
   if (e.code === 'KeyV') toggleRover();
   if (e.code === 'KeyY') toggleView();
+  if (e.code === 'KeyU') backToTop();
   if (/^Digit[1-9]$/.test(e.code)) { state.sel = +e.code[5] - 1; renderHotbar(); }
   if (e.code === 'KeyG' && (params.has('debug') || profile.free)) { player.fly = !player.fly; toast(player.fly ? 'Flying: Space to go up, C to go down. G to stop.' : 'Flying off.'); }
   if (e.code === 'Space') e.preventDefault();
@@ -1618,6 +1619,8 @@ function frame() {
     const below = SHIP_BASE - 1 - Math.floor(player.pos.y);
     $('depth').classList.toggle('hide', below < 2);
     $('depth').textContent = `${below} blocks down`;
+    $('upBtn').classList.toggle('hide', below < 6 || !!adv.wave || panelOpen());
+    if (below >= 6 && !upTold) { upTold = true; toast(TOUCH ? 'Deep down! Hold Jump next to a wall to climb, or tap "Back to the top".' : 'Deep down! Hold Space next to a wall to climb, or press U to go back to the top.'); }
     const hint = $('hint');
     if (!hint.classList.contains('big') || panelOpen()) hint.textContent = nearShip() && launchT < 0 && !panelOpen() ? says('Press F to open the ship') : '';
     if (TOUCH) $('tShip').classList.toggle('far', !nearShip());
@@ -1822,6 +1825,20 @@ async function renderFriendsBox() {
 pets = createPets({ scene, player: () => player, world: () => world, give: (k, n) => give(k, n, true), addCoins: (n) => { profile.coins += n; saveProfile(); renderStatus(); }, fillAir: () => { state.air = MAX_AIR; }, toast: (t) => toast(t), sfx, hidden: () => !playing || race.active });
 quests = createQuests({ toast: (t) => toast(t), banner: (a, b) => banner(a, b), give: (k, n) => give(k, n, true), sfx });
 
+// ---- getting out of deep holes
+let upTold = false;
+function backToTop() {
+  if (!playing || adv.wave) return;
+  // stand on the highest ground close by (your own hole is lower, so this lands you beside it)
+  const x0 = Math.floor(player.pos.x), z0 = Math.floor(player.pos.z);
+  let best = null;
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { const y = world.surfaceY(x0 + dx, z0 + dz); if (!best || y > best.y || (y === best.y && Math.abs(dx) + Math.abs(dz) < best.d)) best = { x: x0 + dx, z: z0 + dz, y, d: Math.abs(dx) + Math.abs(dz) }; }
+  player.pos.x = best.x + 0.5; player.pos.z = best.z + 0.5; player.pos.y = best.y + 1.05; player.vel.y = 0;
+  bits.puff(player.pos.x, player.pos.y, player.pos.z, ['#ffffff', '#ffe9a8']);
+  sfx.craft(); toast('Back on top!');
+}
+$('upBtn').onclick = () => backToTop();
+if (TOUCH) $('upBtn').textContent = '⬆ Back to the top';
 // ---- extra looks: sunsets, auroras, weather, footprints, lava
 function updateLooks(dt) {
   const id = look.planet.id;
