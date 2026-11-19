@@ -18,6 +18,7 @@ import { buildSky, Cloud, Bits } from './effects.js';
 import { PLANETS, planetById, gravityWords, tempWords, starWords, distanceWords, jumpWords } from './planets.js';
 import { worldParams } from './looks.js';
 import { createWater } from './water.js';
+import { createSunset, createAurora, createWeather, createPrints } from './fx2.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -92,6 +93,9 @@ camera.add(lamp); camera.add(lamp.target); lamp.target.position.set(0, -0.3, -5)
 let sky = null, water = null, fogBase = 0;
 let composer = null, bloom = null;
 water = createWater(scene);
+const lavaSea = createWater(scene, { lava: true });
+const sunset = createSunset(scene), aurora = createAurora(scene), weather = createWeather(scene), prints = createPrints(scene);
+let weatherT = 30, weatherOn = false;
 
 const atlas = buildAtlas();
 const mat = new THREE.MeshLambertMaterial({ map: atlas.map, emissiveMap: atlas.emissiveMap, emissive: 0xffffff, emissiveIntensity: 0.9, vertexColors: true, alphaTest: 0.5 });
@@ -145,7 +149,9 @@ function applyLook(id) {
   if (adv) adv.reset();
   scene.fog.color.set(k.fog); fogBase = k.fog;
   scene.background.set(k.top);
-  if (water) water.setLevel(look.terrain.liquid ? look.terrain.sea + 0.9 : null, look.planet.id === 'lhs1140b' ? 0x2f6688 : 0x23889a);
+  if (lavaSea) lavaSea.setLevel(look.terrain.lava ? look.terrain.sea + 0.75 : null);
+  if (prints) prints.clear();
+  if (water) water.setLevel(look.terrain.liquid && !look.terrain.lava ? look.terrain.sea + 0.9 : null, look.planet.id === 'lhs1140b' ? 0x2f6688 : 0x23889a);
   sun.color.set(k.sun); sun.intensity = k.sunI;
   hemi.color.set(k.hemi[0]); hemi.groundColor.set(k.hemi[1]); hemi.intensity = k.hemi[2];
   amb.color.set(k.amb[0]); amb.intensity = k.amb[1];
@@ -165,6 +171,7 @@ function setupWorld(save, arriving = false) {
   state = save ? Object.assign(freshState(), save.state) : freshState();
   homeLv = 0; homeT = 0;
   if (inCamp && !save) { state.fixed = { patch: true, engine: true, fueltank: true, computer: true, launch: false }; state.won = true; state.arrived = true; campKit(); }
+  if (profile.testAll && !state.won && !inCamp) { state.fixed = { patch: true, engine: true, fueltank: true, computer: true, launch: false }; state.won = true; state.arrived = true; }
   if (arriving && !save) { state.fixed = { patch: true, engine: true, fueltank: true, computer: true, launch: false }; state.won = true; state.arrived = true; }
   profile.visited[look.planet.id] = true; saveProfile();
   const struct = shipBlocks(state.fixed);
@@ -1360,7 +1367,7 @@ function updateDig(dt) {
   }
   dig.p += dt * TOOL_SPEED[tier] / b.time;
   dig.hitT -= dt;
-  if (dig.hitT <= 0) { dig.hitT = 0.22; sfx.hit(b.time > 1.5); }
+  if (dig.hitT <= 0) { dig.hitT = 0.22; sfx.hit(b.time > 1.5); bits.chips(hit.x, hit.y, hit.z, hit.nx, hit.ny, hit.nz, colorsOf(hit.id), 4); }
   crackBox.visible = true; crackBox.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
   crackMat.map = cracks[Math.min(5, Math.floor(dig.p * 6))];
   if (dig.p >= 1) {
@@ -1495,7 +1502,8 @@ function frame() {
     updateRover(dt);
     if (ev.stepped) sfx.step();
     if (ev.jumped) sfx.jump();
-    if (ev.landed) sfx.step();
+    if (ev.landed) { sfx.step(); const gx = Math.floor(player.pos.x), gy = Math.floor(player.pos.y) - 1, gz = Math.floor(player.pos.z), gid = world.get(gx, gy, gz); if (gid) bits.puff(player.pos.x, player.pos.y, player.pos.z, colorsOf(gid)); }
+    if (ev.stepped && !player.rover && !player.swimming) { const gid = world.get(Math.floor(player.pos.x), Math.floor(player.pos.y) - 1, Math.floor(player.pos.z)); if (gid === B.REDDIRT || gid === B.DUST) prints.step(player.pos.x, Math.floor(player.pos.y), player.pos.z, player.yaw); }
     if (player.pos.y < -20) { player.pos.y = world.surfaceY(Math.floor(player.pos.x), Math.floor(player.pos.z)) + 2; player.vel.y = 0; }
     state.stats.time += dt;
   }
@@ -1580,9 +1588,11 @@ function frame() {
   adv.update(dt);
   if (playing) updateHome(dt);
   sky.position.copy(camera.position);
+  lavaSea.update(dt, camera.position);
+  updateLooks(dt);
   if (water) {
     water.update(dt, camera.position);
-    player.waterY = water.level;
+    player.waterY = water.level ?? lavaSea.level;
     const under = water.under(camera.position);
     $('underwater').classList.toggle('on', under && playing);
     if (under) { scene.fog.color.set(0x0e4a5a); scene.fog.near = 1; scene.fog.far = 22; }
@@ -1812,6 +1822,25 @@ async function renderFriendsBox() {
 pets = createPets({ scene, player: () => player, world: () => world, give: (k, n) => give(k, n, true), addCoins: (n) => { profile.coins += n; saveProfile(); renderStatus(); }, fillAir: () => { state.air = MAX_AIR; }, toast: (t) => toast(t), sfx, hidden: () => !playing || race.active });
 quests = createQuests({ toast: (t) => toast(t), banner: (a, b) => banner(a, b), give: (k, n) => give(k, n, true), sfx });
 
+// ---- extra looks: sunsets, auroras, weather, footprints, lava
+function updateLooks(dt) {
+  const id = look.planet.id;
+  const sk = sunset.update(camera.position, adv.sunDir, !inCamp || true);
+  if (sk > 0.05) { scene.fog.color.set(fogBase).lerp(new THREE.Color(0xd8704a), sk * 0.35); } 
+  const icy = id === 'europa' || id === 'lhs1140b' || id === 'moon';
+  aurora.update(dt, camera.position, icy ? (adv.isDark() ? 1 : 0.35) * (id === 'moon' ? 0.6 : 1) : 0);
+  // weather comes and goes
+  weatherT -= dt;
+  if (weatherT <= 0) { weatherOn = !weatherOn; weatherT = weatherOn ? 70 + Math.random() * 60 : 90 + Math.random() * 120; }
+  const kind = id === 'mars' ? (state.storm && state.storm.on ? 'dust' : null)
+    : id === 'europa' || id === 'lhs1140b' ? 'snow' : id === 'trappist1e' ? 'rain' : id === 'proxima' ? 'dust' : null;
+  weather.set(kind, kind === 'dust' && id === 'mars' ? 1 : weatherOn || params.has('weather') ? 1 : 0);
+  weather.update(dt, camera.position, null);
+  prints.update(dt);
+  // lava hurts
+  if (look.terrain.lava && playing && player.pos.y + 0.3 < lavaSea.level && !profile.free) { lavaT -= dt; if (lavaT <= 0) { lavaT = 0.6; adv.hurt(2, 'lava'); } }
+}
+let lavaT = 0;
 // ---- seeing yourself: a camera behind you (Y, or View on phones) shows your pilot, pet and Rover
 const eyeV = new THREE.Vector3();
 let behind = false, body = null, bodySuit = null;
@@ -1901,14 +1930,39 @@ function applySettings() {
   if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(window.innerWidth, window.innerHeight); }
   scene.fog.near = RENDER_R * CS * 0.35; scene.fog.far = RENDER_R * CS - 4;
 }
+// ---- for trying the game out: open every world and give the best gear
+function unlockAll() {
+  profile.testAll = true;
+  for (const id of WORLD_ORDER) profile.visited[id] = true;
+  profile.ship = { tank: 2, engine: 3 };
+  profile.gear.weapon = 'sunblade'; profile.gear.shield = 'shadowarmor';
+  profile.rover = true; profile.scanner = Math.max(1, profile.scanner || 0);
+  profile.coins += 5000; document.body.classList.add('hasrover');
+  saveProfile();
+  if (state && !state.won) { state.fixed = { patch: true, engine: true, fueltank: true, computer: true, launch: false }; state.won = true; state.arrived = true; world.setStructure(shipBlocks(state.fixed)); }
+  give('fuelcell', 12, true); give('gem', 5, true); give('scale', 3, true);
+  renderWorlds(); renderGoal(); renderStatus(); renderHotbar(); writeSave();
+  banner('Everything unlocked!', 'All six worlds, the best sword and armour, the Rover, 5,000 coins and 12 fuel cells. Fly anywhere from the ship\'s star map, or pick a world on the title screen.');
+}
+function jumpWave(n) {
+  if (!state.won) unlockAll();
+  profile.waves[look.planet.id] = Math.max(0, Math.min(LAST_WAVE - 1, n));
+  saveProfile(); renderGoal();
+  toast(`Next wave here is ${profile.waves[look.planet.id] + 1}. Start it at the Wave beacon by the ship.`);
+}
 function renderSettings() {
   const row = (label, html) => `<div class="setrow"><span>${label}</span>${html}</div>`;
   const pct = (k) => `<input type="range" min="0" max="100" value="${Math.round(settings[k] / (k === 'sound' ? 0.7 : 1) * 100)}" data-k="${k}">`;
   $('setBody').innerHTML = row('Sound effects', pct('sound')) + row('Music', pct('music'))
     + row('Picture', '<div>' + ['low', 'normal', 'high'].map(q => `<button class="${settings.quality === q ? 'on' : ''}" data-q="${q}">${{ low: 'Fast', normal: 'Normal', high: 'Far view' }[q]}</button>`).join('') + '</div>')
-    + row(TOUCH ? 'Look speed' : 'Mouse speed', `<input type="range" min="30" max="250" value="${Math.round(settings.mouse * 100)}" data-k="mouse">`);
+    + row(TOUCH ? 'Look speed' : 'Mouse speed', `<input type="range" min="30" max="250" value="${Math.round(settings.mouse * 100)}" data-k="mouse">`)
+    + `<h3 class="testh">Try everything</h3><p class="sub">For testing: opens all six worlds, fixes your ship and gives the best gear.</p>`
+    + row('Unlock', `<div><button data-t="all">${profile.testAll ? 'Unlocked ✔ (give again)' : 'Unlock everything'}</button></div>`)
+    + row('Jump to wave', `<div>${[10, 20, 30, 40, 49].map(n => `<button data-w="${n}">${n === 49 ? 'Dragon (50)' : n + 1}</button>`).join('')}</div>`);
   $('setBody').querySelectorAll('input').forEach(i => i.oninput = () => { const k = i.dataset.k, v = +i.value / 100; settings[k] = k === 'sound' ? v * 0.7 : v; applySettings(); saveSettings(); });
-  $('setBody').querySelectorAll('button').forEach(b => b.onclick = () => { settings.quality = b.dataset.q; applySettings(); saveSettings(); renderSettings(); });
+  $('setBody').querySelectorAll('button[data-q]').forEach(b => b.onclick = () => { settings.quality = b.dataset.q; applySettings(); saveSettings(); renderSettings(); });
+  $('setBody').querySelector('button[data-t]').onclick = () => { unlockAll(); renderSettings(); };
+  $('setBody').querySelectorAll('button[data-w]').forEach(b => b.onclick = () => { if (!playing) { toast('Land on a world first, then jump to a wave.'); return; } jumpWave(+b.dataset.w); closePanels(); });
 }
 $('setBtn').onclick = () => { closePanels(false); openPanel('setPanel'); };
 $('setBtn2').onclick = () => openPanel('setPanel');
@@ -1927,5 +1981,5 @@ window.__game = {
   start: () => { playing = true; $('hud').classList.remove('hide'); $('touch').classList.add('on'); for (const p of panels) $(p).classList.add('hide'); renderHotbar(); renderGoal(); },
   pending: () => updateChunks(50), landOn, get look() { return look; },
   hit: () => hit, mouse, keys, tch, TOUCH, dig, useAction, renderGoal, get launchT() { return launchT; },
-  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, makeRover, toggleView, get behind() { return behind; },
+  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; },
 };

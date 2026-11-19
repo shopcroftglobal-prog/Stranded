@@ -204,7 +204,7 @@ export class Cloud {
 export class Bits {
   constructor(scene, material) {
     this.gravity = 12;
-    this.n = 160;
+    this.n = 260;
     this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 0.14, 0.14), new THREE.MeshLambertMaterial(), this.n);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
@@ -213,11 +213,33 @@ export class Bits {
     for (let i = 0; i < this.n; i++) { this.m.makeScale(0, 0, 0); this.mesh.setMatrixAt(i, this.m); this.mesh.setColorAt(i, this.c.set(0xffffff)); }
     scene.add(this.mesh);
   }
+  // small chips while you hit a block: they fly out of the face you are digging
+  chips(x, y, z, nx, ny, nz, colors, n = 3) {
+    for (let j = 0; j < n; j++) {
+      const i = this.k = (this.k + 1) % this.n;
+      this.p.set([x + 0.5 + nx * 0.55 + (nx ? 0 : (Math.random() - 0.5) * 0.7), y + 0.5 + ny * 0.55 + (ny ? 0 : (Math.random() - 0.5) * 0.7), z + 0.5 + nz * 0.55 + (nz ? 0 : (Math.random() - 0.5) * 0.7)], i * 3);
+      this.v.set([nx * 2.5 + (Math.random() - 0.5) * 2, ny * 2.5 + 1 + Math.random() * 1.5, nz * 2.5 + (Math.random() - 0.5) * 2], i * 3);
+      this.life[i] = 0.35 + Math.random() * 0.3;
+      this.mesh.setColorAt(i, this.c.set(colors[(j + (Math.random() * 4 | 0)) % colors.length]));
+    }
+    this.mesh.instanceColor.needsUpdate = true;
+  }
+  // a little puff of dust at your feet when you land
+  puff(x, y, z, colors) {
+    for (let j = 0; j < 10; j++) {
+      const i = this.k = (this.k + 1) % this.n, a = j / 10 * Math.PI * 2;
+      this.p.set([x + Math.cos(a) * 0.25, y + 0.1, z + Math.sin(a) * 0.25], i * 3);
+      this.v.set([Math.cos(a) * 2.2, 1.2 + Math.random(), Math.sin(a) * 2.2], i * 3);
+      this.life[i] = 0.35 + Math.random() * 0.2;
+      this.mesh.setColorAt(i, this.c.set(colors[j % colors.length]));
+    }
+    this.mesh.instanceColor.needsUpdate = true;
+  }
   burst(x, y, z, colors) {
-    for (let j = 0; j < 12; j++) {
+    for (let j = 0; j < 22; j++) {
       const i = this.k = (this.k + 1) % this.n;
       this.p.set([x + 0.2 + Math.random() * 0.6, y + 0.2 + Math.random() * 0.6, z + 0.2 + Math.random() * 0.6], i * 3);
-      this.v.set([(Math.random() - 0.5) * 3, 1.5 + Math.random() * 2.5, (Math.random() - 0.5) * 3], i * 3);
+      this.v.set([(Math.random() - 0.5) * 4, 1.5 + Math.random() * 3, (Math.random() - 0.5) * 4], i * 3);
       this.life[i] = 0.6 + Math.random() * 0.4;
       this.mesh.setColorAt(i, this.c.set(colors[j % colors.length]));
     }

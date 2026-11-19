@@ -21,11 +21,17 @@ function rippleTexture() {
   return t;
 }
 
-export function createWater(scene) {
+export function createWater(scene, opts = {}) {
   const size = 420;
   const geo = new THREE.PlaneGeometry(size, size, 140, 140); geo.rotateX(-Math.PI / 2);
   const normal = rippleTexture();
-  const mat = new THREE.MeshPhongMaterial({ color: 0x2a7f96, specular: 0xfff4d0, shininess: 90, transparent: true, opacity: 0.8, normalMap: normal, normalScale: new THREE.Vector2(0.9, 0.9), depthWrite: false, side: THREE.DoubleSide });
+  const lava = !!opts.lava;
+  const mat = lava
+    ? new THREE.MeshPhongMaterial({ color: 0xff5a10, emissive: 0xff3a00, emissiveIntensity: 1.1, specular: 0xffd080, shininess: 25, normalMap: normal, normalScale: new THREE.Vector2(1.6, 1.6), side: THREE.DoubleSide })
+    : new THREE.MeshPhongMaterial({ color: 0x2a7f96, specular: 0xfff4d0, shininess: 90, transparent: true, opacity: 0.8, normalMap: normal, normalScale: new THREE.Vector2(0.9, 0.9), depthWrite: false, side: THREE.DoubleSide });
+  if (lava) { normal.repeat.set(9, 9); }
+  const light = lava ? new THREE.PointLight(0xff6a20, 0, 26, 1.2) : null;
+  if (light) scene.add(light);
   const shader = { uniforms: { uTime: { value: 0 } } };
   mat.onBeforeCompile = (s) => {
     s.uniforms.uTime = shader.uniforms.uTime;
@@ -41,13 +47,14 @@ export function createWater(scene) {
   let level = null, t = 0;
   return {
     get level() { return level; },
-    setLevel(y, colour) { level = y; m.visible = y != null; if (y != null) { m.position.y = y; if (colour) mat.color.setHex(colour); } },
+    setLevel(y, colour) { level = y; m.visible = y != null; if (light && y == null) light.intensity = 0; if (y != null) { m.position.y = y; if (colour) mat.color.setHex(colour); } },
     update(dt, camPos) {
       if (level == null) return;
-      t += dt; shader.uniforms.uTime.value = t;
+      t += dt * (lava ? 0.35 : 1); shader.uniforms.uTime.value = t;
+      if (light) { light.intensity = 9 + Math.sin(t * 7) * 1.5; light.position.set(camPos.x, level + 1.5, camPos.z); }
       // follow the camera in whole steps so the waves do not slide with you
       m.position.x = Math.round(camPos.x / 16) * 16; m.position.z = Math.round(camPos.z / 16) * 16;
-      normal.offset.set((t * 0.012) % 1, (t * 0.008) % 1);
+      normal.offset.set((t * (lava ? 0.03 : 0.012)) % 1, (t * (lava ? 0.02 : 0.008)) % 1);
     },
     under(p) { return level != null && p.y < level; },
   };
