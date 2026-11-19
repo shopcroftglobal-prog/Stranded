@@ -5,6 +5,7 @@ import { createFriends, PHRASES } from './friends.js';
 import { makeRover, makePilot, animate, SUITS } from './characters.js';
 const LOOKS = { suit: { sand: 0, sea: 100, sun: 100, berry: 250, frost: 250 }, rover: { sun: 0, sea: 150, berry: 150 } };
 import { createPets, caughtPets, PET_GIFTS } from './pets.js';
+import { createHooks } from './hooks.js';
 import { createQuests, dailyQuests, questText, questCoins, BADGES } from './quests.js';
 import { HOME_R, LEVELS, COSY_LIST, comfort, levelOf, atHome, giftReady, claimGift, updateGardens, growTime } from './home.js';
 import { World, CS, H, meshChunk, meshVolume } from './world.js';
@@ -119,7 +120,7 @@ const freshState = () => ({
 });
 let state = freshState();
 let team = null;   // { code, world } when playing a world together
-let inCamp = false, friends = null, quests = null, pets = null;
+let inCamp = false, friends = null, quests = null, pets = null, hooks = null;
 let world, player;
 let playing = false, paused = false;
 let shipMesh = null, launchT = -1;
@@ -564,7 +565,7 @@ const G = {
   godMode: params.has('god'), easy: params.has('easy'),
   banner, showFall, waveReward,
   calm: () => profile.free || inCamp,
-  track: (ev, n) => quests && quests.track(ev, n),
+  track: (ev, n) => { if (quests) quests.track(ev, n); if (hooks) hooks.addXP(ev, n); },
   home: () => ({ at: !!state.flag && atHome(state, player.pos), lv: homeLv, flag: state.flag, inside: (x, z) => !!state.flag && Math.abs(x - state.flag.x - 0.5) <= HOME_R + 0.5 && Math.abs(z - state.flag.z - 0.5) <= HOME_R + 0.5 }),
 };
 let homeLv = 0;
@@ -1119,7 +1120,7 @@ function renderBook() {
 
 // ---------------- panels and pointer lock ----------------
 let dragMode = false, lockFails = 0;
-const panels = ['teamPanel', 'setPanel', 'chatPanel', 'giftPanel', 'buildPanel', 'homePanel', 'adPanel', 'rigPanel', 'bag', 'shipPanel', 'pause', 'win', 'title', 'beaconPanel', 'forgePanel', 'boxPanel', 'shopPanel', 'mapPanel', 'bookPanel', 'fallPanel', 'rewardPanel', 'travel'];
+const panels = ['prizePanel', 'teamPanel', 'setPanel', 'chatPanel', 'giftPanel', 'buildPanel', 'homePanel', 'adPanel', 'rigPanel', 'bag', 'shipPanel', 'pause', 'win', 'title', 'beaconPanel', 'forgePanel', 'boxPanel', 'shopPanel', 'mapPanel', 'bookPanel', 'fallPanel', 'rewardPanel', 'travel'];
 const panelOpen = () => panels.some(id => !$(id).classList.contains('hide'));
 function requestLock() {
   if (dragMode) return;
@@ -1154,6 +1155,7 @@ function openPanel(id) {
   if (id === 'shopPanel') renderShop();
   if (id === 'mapPanel') renderMap();
   if (id === 'bookPanel') renderBook();
+  if (id === 'prizePanel') hooks.render($('prizeBody'));
   if (id === 'rigPanel') renderRig();
   if (id === 'homePanel') renderHome();
   if (id === 'buildPanel') renderBuild();
@@ -1234,6 +1236,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyV') toggleRover();
   if (e.code === 'KeyY') toggleView();
   if (e.code === 'KeyU') backToTop();
+  if (e.code === 'KeyR') openPrizes();
   if (e.code === 'KeyH' && launchT < 0) { bookWorld = '_shop'; openPanel('bookPanel'); }
   if (/^Digit[1-9]$/.test(e.code)) { state.sel = +e.code[5] - 1; renderHotbar(); }
   if (e.code === 'KeyG' && (params.has('debug') || profile.free)) { player.fly = !player.fly; toast(player.fly ? 'Flying: Space to go up, C to go down. G to stop.' : 'Flying off.'); }
@@ -1354,6 +1357,7 @@ function setupTouch() {
   hold('tScan', () => adv.scan(), () => { });
   tap('tRover', () => toggleRover());
   tap('tView', () => toggleView());
+  tap('tPrize', () => openPrizes());
   tap('tShop', () => { if (launchT < 0) { bookWorld = '_shop'; openPanel('bookPanel'); } });
   $('goal').addEventListener('click', () => $('goal').classList.toggle('open'));
   document.querySelectorAll('.close').forEach(b => { b.textContent = 'Close'; });
@@ -1418,6 +1422,7 @@ function updateDig(dt) {
       toast(`New in your book: ${ITEMS[b.item].name}!${ITEMS[b.item].rare ? ' The Trader pays well for it.' : ''}`);
     }
     state.stats.mined++; G.track('mine');
+    { const lk = hooks.dug(); if (lk) { toast(lk); sfx.coin(); bits.burst(hit.x, hit.y, hit.z, GOLDS); } }
     dig.on = false; dig.p = 0; crackBox.visible = false;
     renderGoal();
   }
@@ -1781,6 +1786,7 @@ renderFree();
 function start() {
   if (inCamp) leaveCampMode();
   if (team) leaveTeamMode();
+  setTimeout(renderLevel, 0);
   if (!look || look.planet.id !== picked || SAVE_KEY !== saveKey(picked)) landOn(picked, false);
   const got = accrueAll();
   if (Object.keys(got).length) setTimeout(() => banner('Welcome back!', `Your mining rigs dug ${rigSummary(got)} while you were away. Empty them to collect.`), 600);
@@ -1910,6 +1916,22 @@ async function renderFriendsBox() {
   $('friendsBox').innerHTML = !friends.connected ? '' : list.length ? `<b>Friends online (${list.length})</b>` + list.map(f => `<div>${f.name.replace(/[&<>]/g, '')} <span>${wn(f.w)}</span></div>`).join('') : '<b>Friends online</b><div><span>Nobody else right now.</span></div>';
 }
 pets = createPets({ scene, player: () => player, world: () => world, give: (k, n) => give(k, n, true), addCoins: (n) => { profile.coins += n; saveProfile(); renderStatus(); }, fillAir: () => { state.air = MAX_AIR; }, toast: (t) => toast(t), sfx, hidden: () => !playing || race.active });
+const GOLDS = [0xffd54a, 0xfff3a0, 0xffb347, 0xffffff].map(c => new THREE.Color(c));
+hooks = createHooks({ give: (k, n) => give(k, n, true), toast: (t) => toast(t), banner: (a, b) => banner(a, b), sfx, ITEMS, icon,
+  burst: () => { if (!player) return; for (let k = 0; k < 3; k++) bits.burst(player.pos.x - 0.5 + (Math.random() - 0.5) * 2, player.pos.y + 0.8, player.pos.z - 0.5 + (Math.random() - 0.5) * 2, GOLDS); },
+  onChange: () => { renderLevel(); } });
+let wasWaiting = null;
+setInterval(() => { if (!hooks || !playing) return; const w = hooks.waiting(); if (w && wasWaiting === false) toast(hooks.chestReady() ? 'A free chest is ready! Press R (Prizes) to open it.' : 'You have a free spin! Press R (Prizes).'); wasWaiting = w; renderLevel(); }, 20000);
+function renderLevel() {
+  if (!hooks) return;
+  const h = hooks.h;
+  $('lvNum').textContent = `Lv ${h.lv}`;
+  $('lvFill').style.width = `${Math.min(100, h.xp / hooks.need(h.lv) * 100)}%`;
+  const w = hooks.waiting();
+  $('prizeBtn').classList.toggle('ready', w); $('tPrize').classList.toggle('ready', w);
+}
+function openPrizes() { if (launchT < 0 && !race.active) openPanel('prizePanel'); }
+$('prizeBtn').onclick = openPrizes;
 quests = createQuests({ toast: (t) => toast(t), banner: (a, b) => banner(a, b), give: (k, n) => give(k, n, true), sfx });
 
 // ---- getting out of deep holes
@@ -2085,5 +2107,5 @@ window.__game = {
   start: () => { playing = true; $('hud').classList.remove('hide'); $('touch').classList.add('on'); for (const p of panels) $(p).classList.add('hide'); renderHotbar(); renderGoal(); },
   pending: () => updateChunks(50), landOn, get look() { return look; },
   hit: () => hit, mouse, keys, tch, TOUCH, dig, useAction, renderGoal, get launchT() { return launchT; },
-  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; },
+  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; },
 };

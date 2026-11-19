@@ -186,6 +186,32 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
 @keyframes blink { 50% { opacity: 0.45 } }
 #bars .meta { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
 #coins { color: #f0c24a; }
+#lvBox { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-size: 12px; color: #ffe7a8; }
+#lvBox .xpbar { flex: 1; }
+.xpbar { height: 7px; background: #2a140c; border: 1px solid #6b3a22; border-radius: 4px; overflow: hidden; }
+.xpbar > div { height: 100%; width: 0; background: linear-gradient(90deg, #f0a030, #ffe066); transition: width .4s; }
+#prizeBtn { padding: 2px 8px; font-size: 12px; pointer-events: auto; position: relative; }
+#prizeBtn.ready::after, #tPrize.ready::after { content: ''; position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 6px #ff4d4d; animation: pulse 1s infinite alternate; }
+#tPrize { position: relative; }
+@keyframes pulse { from { transform: scale(.8); } to { transform: scale(1.2); } }
+.lvhead { display: flex; align-items: center; gap: 10px; font-size: 18px; }
+.lvhead .xpbar { flex: 1; height: 12px; }
+.lvhead span { font-size: 13px; color: var(--muted); }
+.prizes { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; align-items: center; margin: 10px 0; }
+.wheelbox { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.wheelbox canvas { width: min(300px, 70vw); height: auto; border-radius: 50%; box-shadow: 0 0 24px rgba(255,190,80,.35); }
+.wpin { position: absolute; top: -6px; left: 50%; margin-left: -12px; width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 24px solid #fff3c4; z-index: 2; filter: drop-shadow(0 2px 2px #000); }
+.chestbox { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 220px; text-align: center; }
+.chesticon { width: 96px; height: 72px; border-radius: 8px 8px 4px 4px; background: linear-gradient(#a0642a 0 38%, #3a1d0e 38% 46%, #8a521f 46%); border: 4px solid #3a1d0e; position: relative; }
+.chesticon::after { content: ''; position: absolute; left: 50%; top: 30%; width: 16px; height: 20px; margin-left: -8px; background: #e8c547; border: 2px solid #3a1d0e; }
+.chesticon.ready { animation: wob 0.9s infinite; box-shadow: 0 0 22px #ffd54a; }
+@keyframes wob { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
+.road { display: flex; align-items: flex-start; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
+.rstep { min-width: 104px; background: #2a140c; border: 1px solid #6b3a22; border-radius: 6px; padding: 6px; font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
+.rstep.big { border-color: #e8c547; box-shadow: 0 0 10px rgba(232,197,71,.5); }
+.rstep img { width: 16px; height: 16px; vertical-align: middle; image-rendering: pixelated; }
+.rlv { font-weight: bold; color: #ffe7a8; font-size: 14px; }
+.rspin { color: #9fe0a8; }
 #waveBox { position: absolute; top: 98px; left: 50%; transform: translateX(-50%); padding: 5px 14px; font-size: 16px; color: #ffd7b0; white-space: nowrap; }
 #lostBox { position: absolute; top: 140px; left: 50%; transform: translateX(-50%); padding: 4px 12px; font-size: 14px; color: #f0c24a; }
 .hpbar { display: inline-block; width: 70px; height: 8px; background: #1a0905; border: 1px solid #6e2d18; vertical-align: middle; position: relative; }
@@ -324,7 +350,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <div id="tool"></div>
   <div id="hotbar"></div>
   <div id="bars" class="panel"><span>Health</span><div class="bar"><i id="hpFill"></i></div><span>Air</span><div class="bar"><i id="airFill"></i></div>
-    <div class="meta"><span id="daytime"></span><span id="coins"></span></div><div id="homeTag" class="hide"></div></div>
+    <div class="meta"><span id="daytime"></span><span id="coins"></span></div><div id="lvBox"><b id="lvNum">Lv 1</b><div class="xpbar"><div id="lvFill"></div></div><button id="prizeBtn" title="Prizes (R)">Prizes</button></div><div id="homeTag" class="hide"></div></div>
   <div id="waveBox" class="panel hide"></div>
   <div id="lostBox" class="panel hide"></div>
   <div id="banner" class="hide"></div>
@@ -338,7 +364,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <button class="tbtn" id="tPlace">Use</button>
   <button class="tbtn" id="tScan">Scan</button>
   <button class="tbtn" id="tRover">Drive</button>
-  <div id="tmenu"><button id="tBag">Bag</button><button id="tBook">Book</button><button id="tChat">Say</button><button id="tFly">Fly</button><button id="tView">View</button><button id="tShop">Shop</button><button id="tShip" class="far">Ship</button><button id="tPause">II</button></div>
+  <div id="tmenu"><button id="tBag">Bag</button><button id="tBook">Book</button><button id="tChat">Say</button><button id="tFly">Fly</button><button id="tView">View</button><button id="tPrize">Prizes</button><button id="tShop">Shop</button><button id="tShip" class="far">Ship</button><button id="tPause">II</button></div>
 </div>
 
 <div id="lockmsg" class="panel hide">Click to look around</div>
@@ -487,6 +513,11 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <div id="setBody"></div>
   <p class="sub">"Fast" helps on older phones. "Far view" shows more of the world.</p>
 </div></div>
+ <div id="prizePanel" class="overlay hide"><div class="dialog panel" style="width:min(720px,100%)">
+  <button class="close" data-close>Close</button>
+  <h2>Prizes</h2>
+  <div id="prizeBody"></div>
+ </div></div>
  <div id="teamPanel" class="overlay hide"><div class="dialog panel" style="width:min(480px,100%)">
   <div class="head"><h2>Team up</h2><button id="teamClose">Close</button></div>
   <p class="sub">Play the same world with up to 2 friends. Everything you dig and build is shared, and the ship jobs are split between you, so you finish faster. Everyone needs this game shared with them.</p>

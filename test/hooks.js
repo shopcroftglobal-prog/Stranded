@@ -1,0 +1,31 @@
+const { chromium } = require('playwright');
+const path = require('path');
+(async () => {
+  const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
+  const p = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.goto('file://' + path.resolve(__dirname, '../dist/play.html') + '?desktop&shot', { timeout: 90000 });
+  await p.evaluate(() => localStorage.clear()); await p.reload({ timeout: 90000 }); await p.waitForTimeout(800);
+  await p.evaluate(() => document.getElementById('playBtn') ? document.getElementById('playBtn').click() : __game.start && __game.start());
+  await p.waitForTimeout(1500);
+  const c0 = await p.evaluate(() => __game.profile ? __game.profile.coins : null);
+  console.log('START', await p.evaluate(() => JSON.stringify(__game.hooks.h)), 'coins', c0);
+  // 200 digs worth of xp + 2 imps -> level ups
+  await p.evaluate(() => { for (let i = 0; i < 200; i++) __game.hooks.addXP('mine'); __game.hooks.addXP('imp', 2); });
+  console.log('AFTER XP', await p.evaluate(() => JSON.stringify(__game.hooks.h)), await p.evaluate(() => document.getElementById('lvNum').textContent));
+  let lucky = 0; await p.evaluate(() => { window.__l = 0; for (let i = 0; i < 1000; i++) if (__game.hooks.dug()) window.__l++; }); lucky = await p.evaluate(() => window.__l);
+  console.log('LUCKY of 1000', lucky);
+  await p.keyboard.press('KeyR'); await p.waitForTimeout(500);
+  await p.screenshot({ path: 'test/shots/prizes.png' });
+  console.log('SPINS', await p.evaluate(() => __game.hooks.spinsLeft()), 'chest', await p.evaluate(() => __game.hooks.chestReady()));
+  await p.evaluate(() => document.getElementById('spinBtn').click());
+  await p.waitForTimeout(1500); await p.screenshot({ path: 'test/shots/prizes_spin.png' });
+  await p.waitForTimeout(3000);
+  console.log('AFTER SPIN', await p.evaluate(() => __game.hooks.spinsLeft()), await p.evaluate(() => document.getElementById('banner').innerText));
+  await p.evaluate(() => document.getElementById('chestBtn').click()); await p.waitForTimeout(400);
+  console.log('CHEST', await p.evaluate(() => document.getElementById('banner').innerText), await p.evaluate(() => document.getElementById('chestBtn').textContent));
+  await p.screenshot({ path: 'test/shots/prizes_after.png' });
+  await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+  await p.screenshot({ path: 'test/shots/prizes_hud.png' });
+  console.log('ERR', errs.join('\n') || 'none'); await browser.close();
+})();
