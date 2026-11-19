@@ -55,7 +55,8 @@ export function createFriends(ctx) {
   }
 
   // ---- the shared camp world
-  const CHUNKS = 'camp';
+  let CHUNKS = 'camp', cfg = { room: 'friends-camp', where: 'camp' };
+  let unsubInfo = null;
   const known = new Set();           // chunk docs that exist
   const pending = new Map();         // chunk doc id -> { field: blockId }
   let flushing = false, unsubDb = null, applying = false;
@@ -63,9 +64,15 @@ export function createFriends(ctx) {
   const field = (x, y, z) => `b${x}_${y}_${z}`.replace(/-/g, 'm');
   const parse = (f) => f.slice(1).replace(/m/g, '-').split('_').map(Number);
 
-  async function enterCamp() {
+  // opts: { room, coll, where, info, onInfo, max } — the Friends' camp by default, or a team world
+  async function enterCamp(opts = {}) {
     await caps();
+    cfg = { room: opts.room || 'friends-camp', where: opts.where || 'camp', info: opts.info || null, onInfo: opts.onInfo || null, max: opts.max || 0 };
+    CHUNKS = opts.coll || 'camp';
     campOn = true;
+    if (db && cfg.info && !unsubInfo) {
+      unsubInfo = db.collection(cfg.info).onSnapshot((snap) => { for (const ch of snap.docChanges()) if (ch.type !== 'removed' && cfg.onInfo) cfg.onInfo(ch.doc.id, ch.doc.data() || {}); }, () => { unsubInfo = null; });
+    }
     // live blocks
     if (db && !unsubDb) {
       unsubDb = db.collection(CHUNKS).limit(1000).onSnapshot((snap) => {
@@ -87,15 +94,33 @@ export function createFriends(ctx) {
     // live pilots
     if (room && !campRoom) {
       try {
-        campRoom = await room.join('friends-camp');
-        campRoom.onPeers(() => syncOthers());
+        campRoom = await room.join(cfg.room);
+        campRoom.onPeers(() => { syncOthers(); ctx.onTeam && ctx.onTeam(); });
+        if (cfg.max) await new Promise(r => setTimeout(r, 900));
+        if (cfg.max && team().length > cfg.max) { campRoom.leave().catch(() => {}); campRoom = null; return 'full'; }
       } catch (e) { campRoom = null; }
     }
-    where('camp');
+    where(cfg.where);
+    return 'ok';
+  }
+  // write a small shared note for the team (for example, which ship parts are fitted)
+  async function setInfo(id, data) {
+    if (!db || !cfg.info) return;
+    try { const ref = db.collection(cfg.info).doc(id); const s = await ref.get(); if (s.exists) await ref.update(data); else await ref.set(data); } catch (e) { }
+  }
+  // everyone in the team, in the same order on every screen (so jobs can be split fairly)
+  function team() {
+    if (!campRoom) return [{ me: true, peer: 'me' }];
+    const ps = campRoom.peers().filter(p => p.kind === 'viewer' && !(p.sameTab && !p.isMe));
+    const seen = new Set(), out = [];
+    for (const p of ps) { const key = p.by || p.peer; if (seen.has(key)) continue; seen.add(key); out.push({ me: !!p.isMe, peer: p.peer, by: p.by }); }
+    out.sort((a, b) => String(a.by || a.peer).localeCompare(String(b.by || b.peer)));
+    return out;
   }
   function leaveCamp() {
     campOn = false;
     if (unsubDb) { unsubDb(); unsubDb = null; }
+    if (unsubInfo) { unsubInfo(); unsubInfo = null; }
     known.clear();
     if (campRoom) { campRoom.leave().catch(() => {}); campRoom = null; }
     for (const [, o] of others) ctx.scene.remove(o.m);
@@ -220,7 +245,8 @@ export function createFriends(ctx) {
   }
 
   return {
-    enterCamp, leaveCamp, blockChanged, update, chat, friendAt, sendGift, lobbyList, where,
+    enterCamp, leaveCamp, blockChanged, update, chat, friendAt, sendGift, lobbyList, where, setInfo, team, nameOf,
+    get debug() { return { info: !!unsubInfo, chunks: !!unsubDb, cfg: { ...cfg, onInfo: !!cfg.onInfo }, CHUNKS, db: !!db, campOn }; },
     get on() { return campOn; }, get others() { return others; }, get connected() { return !!room; }, get canBuild() { return !!db; },
     chatLog,
   };

@@ -338,7 +338,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <button class="tbtn" id="tPlace">Use</button>
   <button class="tbtn" id="tScan">Scan</button>
   <button class="tbtn" id="tRover">Drive</button>
-  <div id="tmenu"><button id="tBag">Bag</button><button id="tBook">Book</button><button id="tChat">Say</button><button id="tFly">Fly</button><button id="tView">View</button><button id="tShip" class="far">Ship</button><button id="tPause">II</button></div>
+  <div id="tmenu"><button id="tBag">Bag</button><button id="tBook">Book</button><button id="tChat">Say</button><button id="tFly">Fly</button><button id="tView">View</button><button id="tShop">Shop</button><button id="tShip" class="far">Ship</button><button id="tPause">II</button></div>
 </div>
 
 <div id="lockmsg" class="panel hide">Click to look around</div>
@@ -358,6 +358,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
       <button id="newBtn" class="hide">Start over</button>
       <button id="raceBtn" class="racebtn">Star Kart racing</button>
       <button id="campBtn" class="campbtn">Friends' camp</button>
+      <button id="teamBtn" class="campbtn">Team up (up to 3)</button>
       <button id="setBtn">Settings</button>
       <button id="freeBtn" title="No air loss, no night creatures, and you can fly. Good for building.">Free roam: off</button>
     </div>
@@ -486,6 +487,13 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <div id="setBody"></div>
   <p class="sub">"Fast" helps on older phones. "Far view" shows more of the world.</p>
 </div></div>
+ <div id="teamPanel" class="overlay hide"><div class="dialog panel" style="width:min(480px,100%)">
+  <div class="head"><h2>Team up</h2><button id="teamClose">Close</button></div>
+  <p class="sub">Play the same world with up to 2 friends. Everything you dig and build is shared, and the ship jobs are split between you, so you finish faster. Everyone needs this game shared with them.</p>
+  <div class="setrow"><span>Start a team</span><div><button id="teamNew">Start a new team on <span id="teamWorld"></span></button></div></div>
+  <div class="setrow"><span>Join a team</span><div><input id="teamCode" maxlength="4" placeholder="Code" style="width:90px;text-transform:uppercase;font:inherit;padding:6px"> <button id="teamJoin">Join</button></div></div>
+  <p class="sub" id="teamNote"></p>
+ </div></div>
  <div id="chatPanel" class="overlay hide"><div class="dialog panel" style="width:min(460px,100%)">
   <button class="close" data-close>Close (T)</button>
   <h2>Say something</h2>

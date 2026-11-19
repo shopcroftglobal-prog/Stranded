@@ -122,11 +122,42 @@ function bat(w) {
   return root;
 }
 
+// Gloom imp: a small horned troublemaker that lives in camps out in the wild.
+// It sits still until you come close, then runs at you with its little fork.
+function imp(w) {
+  const S = skinOf(w);
+  const skin = ['#3a1a3e', '#4a2250', '#2e1430', '#542a5a'];
+  const root = new THREE.Group(), rig = {};
+  const body = new THREE.Group(); root.add(body); rig.body = body;
+  at(body, box(7, 7, 5, (f, i, j) => (f === 'front' && j === 5 && i > 1 && i < 5 ? '#1a0a1a' : pick(skin, hash(i, j, 71))), 'impb'), 0, 7.5, 0);
+  const head = new THREE.Group(); head.position.set(0, 12.5 * PX, 0); body.add(head); rig.head = head;
+  at(head, box(8, 6, 6, (f, i, j) => {
+    if (f === 'front') {
+      if (j === 2 && (i === 1 || i === 2 || i === 5 || i === 6)) return [S.eye, S.eye];   // glowing eyes
+      if (j === 4 && i > 1 && i < 6) return i % 2 ? '#f4eee0' : '#1a0a1a';               // grin
+    }
+    return pick(skin, hash(i, j, 72));
+  }, 'imph' + w), 0, 0, 0);
+  for (const s of [-1, 1]) {                                                              // horns
+    const h = at(head, box(2, 4, 2, (f, i, j) => (j === 0 ? '#f0e0c0' : '#c8b090'), 'imphorn'), s * 3, 4, 0);
+    h.rotation.z = -s * 0.35;
+  }
+  rig.legs = [];
+  for (const s of [-1, 1]) { const g = at(body, box(2, 4, 2, (f, i, j) => (j > 2 ? '#120612' : pick(skin, hash(i, j, 73))), 'impl'), s * 2, 4, 0); g.children[0].position.y = -2 * PX; g.userData.p = s; rig.legs.push(g); }
+  const arm = at(body, box(2, 6, 2, (f, i, j) => pick(skin, hash(i, j, 74)), 'impa'), 4.5, 10, 0); arm.children[0].position.y = -3 * PX; rig.arm = arm;
+  at(arm, box(1, 12, 1, (f, i, j) => (j < 3 ? ['#ff8a3a', '#ff5a1a'] : '#5a3a24'), 'impfork'), 0, -4, 2);   // the fork, with a hot tip
+  // a little tail
+  const tail = at(body, box(1, 1, 6, (f, i, j) => '#2e1430', 'impt'), 0, 5, -4); tail.rotation.x = 0.5; rig.tail = tail;
+  root.userData = { rig, kind: 'imp', height: 17 * PX, radius: 0.35 };
+  return root;
+}
+
 export const ENEMIES = {
   biter: { name: 'Dust biter', make: biter, hp: 6, hit: 2, speed: 3.2, from: 1 },
   roller: { name: 'Rock roller', make: roller, hp: 12, hit: 3, speed: 2.4, from: 4 },
   spitter: { name: 'Ice spitter', make: spitter, hp: 8, hit: 2, speed: 1.8, from: 8, shoots: true },
   bat: { name: 'Shadow bat', make: bat, hp: 5, hit: 1, speed: 4.2, from: 12 },
+  imp: { name: 'Gloom imp', make: imp, hp: 7, hit: 2, speed: 3.6, from: 999, camp: true },
 };
 // mini bosses at waves 10, 20, 30 and 40
 export const BIG = { 10: 'biter', 20: 'roller', 30: 'spitter', 40: 'bat' };
@@ -147,6 +178,12 @@ export function animateEnemy(m, t, moving) {
   } else if (kind === 'spitter') {
     rig.legs.forEach((g) => { g.rotation.x = Math.sin(t * 8) * 0.5 * g.userData.p * moving; });
     rig.body.rotation.z = Math.sin(t * 3) * 0.05;
+  } else if (kind === 'imp') {
+    rig.legs.forEach((g) => { g.rotation.x = Math.sin(t * 13) * 0.7 * g.userData.p * moving; });
+    rig.arm.rotation.x = -0.4 - Math.max(0, Math.sin(t * 6)) * 0.9 * moving;
+    rig.head.rotation.z = Math.sin(t * 2.3) * 0.12;
+    rig.tail.rotation.y = Math.sin(t * 5) * 0.5;
+    rig.body.position.y = moving ? Math.abs(Math.sin(t * 13)) * 0.04 : Math.sin(t * 2) * 0.015;
   } else if (kind === 'bat') {
     rig.wings.forEach((g) => { g.rotation.z = g.userData.s * Math.sin(t * 16) * 0.7; });
     rig.body.position.y = 0.4 + Math.sin(t * 4) * 0.1;

@@ -96,7 +96,8 @@ export function createAdventure(G) {
   function hurt(n, why) {
     if (S().hp <= 0 || G.godMode) return;
     const sh = profile.gear.shield ? ITEMS[profile.gear.shield].guard : 0;
-    const dmg = Math.max(0.5, n * (1 - sh));
+    const tough = 1 - 0.08 * (profile.ups && profile.ups.armor || 0);
+    const dmg = Math.max(0.5, n * (1 - sh) * tough);
     S().hp = Math.max(0, S().hp - dmg);
     sinceHurt = 0; flashT = 0.35; sfx.hurt();
     if (S().hp <= 0) fall(why);
@@ -246,6 +247,63 @@ export function createAdventure(G) {
     }
   }
 
+  // ---------------------------------------------------------------- imp camps: small villains out in the wild
+  const camps = [];
+  let campT = 8;
+  function makeCampMark() {
+    const g = new THREE.Group();
+    const fire = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.5), new THREE.MeshLambertMaterial({ color: 0x401010, emissive: 0xff5a1a, emissiveIntensity: 1.6 }));
+    fire.position.y = 0.18; g.add(fire);
+    for (let k = 0; k < 4; k++) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.3, 0.12), new THREE.MeshLambertMaterial({ color: 0x3a2418 })); const a2 = k / 4 * Math.PI * 2; st.position.set(Math.cos(a2) * 1.4, 0.6, Math.sin(a2) * 1.4); st.rotation.z = Math.cos(a2) * 0.2; g.add(st); const sk = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshLambertMaterial({ color: 0xe8dcc0 })); sk.position.set(Math.cos(a2) * 1.4, 1.3, Math.sin(a2) * 1.4); g.add(sk); }
+    const l = new THREE.PointLight(0xff6a2a, 4, 9, 1.5); l.position.y = 0.8; g.add(l);
+    return g;
+  }
+  function updateCamps(dt) {
+    if (G.calm() || wave) return;
+    campT -= dt;
+    for (const c of [...camps]) if (Math.hypot(c.x - P().x, c.z - P().z) > 90) removeCamp(c, false);
+    if (campT > 0) return;
+    campT = 25 + rnd() * 20;
+    if (camps.length >= 2) return;
+    const s = ringSpot(30, 48);
+    if (!s || Math.hypot(s.x - G.shipCenter.x, s.z - G.shipCenter.z) < 25) return;
+    const c = { x: s.x, y: s.y, z: s.z, left: 0, alerted: false, m: makeCampMark() };
+    c.m.position.set(s.x, s.y, s.z); scene.add(c.m);
+    const n = 2 + Math.floor(rnd() * 2) + (wavesOn(W()) >= 20 ? 1 : 0);
+    for (let k = 0; k < n; k++) {
+      const a2 = k / n * Math.PI * 2;
+      const sp = { x: s.x + Math.cos(a2) * 2.2, z: s.z + Math.sin(a2) * 2.2 }; sp.y = surface(sp.x, sp.z);
+      const e = spawnEnemy('imp', { visitor: true, spot: sp, n: wavesOn(W()) });
+      e.camp = c; c.left++;
+    }
+    camps.push(c);
+  }
+  function campAlert(c) {
+    if (c.alerted) return; c.alerted = true;
+    sfx.roar();
+    if (!profile.impSeen) { profile.impSeen = true; saveProfile(); G.banner('Gloom imps!', 'They guard a camp. Beat them all for a treasure chest.'); }
+    else G.toast('Gloom imps are coming at you!');
+    for (const e of enemies) if (e.camp === c) e.aggro = true;
+  }
+  function impDown(e) {
+    const c = e.camp, gold = 6 + Math.floor(rnd() * 5) + Math.floor(wavesOn(W()) / 5);
+    profile.coins += gold; saveProfile();
+    G.toast(`+${gold} coins`); G.track('imp');
+    c.left--;
+    if (c.left <= 0) {
+      const got = chest(Math.max(5, wavesOn(W()) + 1)), bonus = 40 + wavesOn(W()) * 2;
+      for (const [k, n] of Object.entries(got)) G.give(k, n, true);
+      if (rnd() < 0.25) G.give('gem', 1, true);
+      profile.coins += bonus; saveProfile();
+      sfx.win(); G.banner('Imp camp cleared!', `Treasure: ${bonus} coins and ${Object.entries(got).map(([k, n]) => n + ' ' + ITEMS[k].name).join(', ')}.`);
+      burst(c.x, c.y + 1, c.z, 0xffd060);
+      removeCamp(c, false);
+    }
+  }
+  function removeCamp(c, withImps = true) {
+    scene.remove(c.m); camps.splice(camps.indexOf(c), 1);
+    for (const e of [...enemies]) if (e.camp === c) { if (withImps || !e.aggro) removeEnemy(e); }
+  }
   // ---------------------------------------------------------------- waves
   function spawnEnemy(type, opts = {}) {
     const big = !!opts.big, boss = !!opts.boss;
@@ -306,7 +364,7 @@ export function createAdventure(G) {
     for (let i = 0; i < n; i++) spawnEnemy(rnd() < 0.5 ? 'bat' : 'biter', { visitor: true, n: wavesOn(W()) });
     G.toast('Night visitors! Creatures are coming.');
   }
-  function clearVisitors() { for (const e of enemies.filter(e => !e.wave)) removeEnemy(e); visitors = false; }
+  function clearVisitors() { for (const e of enemies.filter(e => !e.wave && !e.camp)) removeEnemy(e); visitors = false; }
   function removeEnemy(e) { scene.remove(e.m); const i = enemies.indexOf(e); if (i >= 0) enemies.splice(i, 1); }
   function chest(n) {
     const st = Math.ceil(n / 10);
@@ -332,7 +390,13 @@ export function createAdventure(G) {
     if (x2 > 1) for (const k in items) items[k] *= 2;
     const lines = [];
     if (!again) profile.waves[id] = Math.max(wavesOn(id), n);
+    // first wave won each day pays double; every stage cleared pays a big bonus
+    const today = new Date().toDateString();
+    if (profile.firstWin !== today) { profile.firstWin = today; coins *= 2; lines.push('First win today: double coins!'); }
+    if (n % 5 === 0 && n % 10 !== 0) { items.gem = (items.gem || 0) + 1; lines.push('Lucky wave: a free Gem!'); }
     if (n % 10 === 0 && !again) {
+      const bonus = Math.round(150 * (n / 10) * power());
+      coins += bonus; lines.push(`Stage bonus: +${bonus} coins. Spend them in the Shop (H).`);
       if (n === 10) { items.gold = (items.gold || 0) + 3; items.gem = (items.gem || 0) + 1; items.bed = 1; }
       if (n === 20) { items.box = 2; items.airmaker = 1; if (!profile.buddy) { profile.buddy = true; lines.push('Buddy the robot joins you!'); } }
       if (n === 30) { items.gem = (items.gem || 0) + 2; if (profile.ship.tank < 2) { profile.ship.tank = 2; lines.push('Your ship gets a bigger fuel tank.'); } }
@@ -366,7 +430,8 @@ export function createAdventure(G) {
       for (let k = 0; k < (e.boss ? 8 : 2); k++) burst(e.pos.x + (rnd() - 0.5), e.pos.y + e.m.userData.height * rnd(), e.pos.z + (rnd() - 0.5), 0xffffff);
       sfx.pop();
       note(W(), e.boss ? 'dragon' : (e.big ? 'big-' : '') + e.type);
-      if (!e.wave) { profile.coins += 2; saveProfile(); }
+      if (!e.wave && !e.camp) { profile.coins += 2; saveProfile(); }
+      if (e.camp) impDown(e);
       removeEnemy(e);
     }
   }
@@ -390,12 +455,13 @@ export function createAdventure(G) {
     if (attackCD > 0) return false;
     const w = weapon();
     attackCD = 0.42;
+    const pw = 1 + 0.12 * (profile.ups && profile.ups.dmg || 0);
     sfx.swing();
     G.swingArm();
     if (target && target.t <= (w.reach || 3.4) + (target.ent.m.userData.radius || 0)) {
       const e0 = target.ent, at = e0.pos.clone();
-      strike(e0, w.dmg, P());
-      if (w.area) for (const e of [...enemies]) if (e !== e0 && e.pos.distanceTo(at) < w.area) { strike(e, w.dmg * 0.6, at); for (let k = 0; k < 6; k++) G.flames.emit(e.pos.x, e.pos.y + 0.6, e.pos.z, (rnd() - 0.5) * 3, rnd() * 3, (rnd() - 0.5) * 3, 0.5); }
+      strike(e0, w.dmg * pw, P());
+      if (w.area) for (const e of [...enemies]) if (e !== e0 && e.pos.distanceTo(at) < w.area) { strike(e, w.dmg * 0.6 * pw, at); for (let k = 0; k < 6; k++) G.flames.emit(e.pos.x, e.pos.y + 0.6, e.pos.z, (rnd() - 0.5) * 3, rnd() * 3, (rnd() - 0.5) * 3, 0.5); }
       const arm = profile.gear.shield && ITEMS[profile.gear.shield];
       if (arm && arm.lifesteal) heal(arm.lifesteal);
       return true;
@@ -508,7 +574,13 @@ export function createAdventure(G) {
         }
       } else {
         const keep = ENEMIES[e.type]?.shoots ? 7 : e.boss ? 3.5 : 0.9 + ud.radius;
-        moving = moveWalker(e, dt, me, keep);
+        if (e.camp) {
+          const dMe = Math.hypot(me.x - e.pos.x, me.z - e.pos.z);
+          if (!e.aggro && dMe < 9 && Math.abs(me.y - e.pos.y) < 5) { e.aggro = true; campAlert(e.camp); }
+          if (e.aggro && dMe > 28) e.aggro = false;
+          if (e.aggro) moving = moveWalker(e, dt, me, keep);
+          else { const h = e.camp; const dh = Math.hypot(h.x - e.pos.x, h.z - e.pos.z); moving = dh > 2.5 ? moveWalker(e, dt, V(h.x, h.y, h.z), 1.5) : 0; if (!moving) e.m.rotation.y += dt * 0.3; }
+        } else moving = moveWalker(e, dt, me, keep);
       }
       // spike traps hurt creatures that walk on them
       if (!e.flies && !e.boss) {
@@ -524,7 +596,7 @@ export function createAdventure(G) {
       e.cd -= dt;
       const flat = Math.hypot(me.x - e.pos.x, me.z - e.pos.z), dy = me.y - e.pos.y;
       const reach = ud.radius + (e.boss ? 1.6 : 0.9);
-      if (flat < reach && dy > -2.5 && dy < (e.boss ? 6 : 2) && e.cd <= 0) { e.cd = e.boss ? 1.6 : 1.1; hurt(e.hit, 'creature'); }
+      if ((!e.camp || e.aggro) && flat < reach && dy > -2.5 && dy < (e.boss ? 6 : 2) && e.cd <= 0) { e.cd = e.boss ? 1.6 : 1.1; hurt(e.hit, 'creature'); }
       if (ENEMIES[e.type]?.shoots && !e.boss) {
         e.shotCD -= dt;
         if (e.shotCD <= 0 && flat < 18) { e.shotCD = 2.6; fire(e, e.pos.clone().setY(e.pos.y + ud.height * 0.8), 1.5 * power(), 0x9fe8ff); }
@@ -543,7 +615,7 @@ export function createAdventure(G) {
       }
       if (e.glow > 0) e.glow -= dt;
       // keep them near you
-      if (flat > 45) { e.far += dt; if (e.far > 6) { const s = ringSpot(14, 20); e.pos.set(s.x, s.y, s.z); e.far = 0; } } else e.far = 0;
+      if (flat > 45 && !e.camp) { e.far += dt; if (e.far > 6) { const s = ringSpot(14, 20); e.pos.set(s.x, s.y, s.z); e.far = 0; } } else e.far = 0;
       e.m.position.copy(e.pos);
       if (e.boss) animate(e.m, t, moving); else animateEnemy(e.m, t, moving);
       const pulse = e.glow > 0 ? 1 + Math.min(1, e.glow) * 0.08 : 1;
@@ -571,7 +643,7 @@ export function createAdventure(G) {
       }
       if (!wave.todo.length && !enemies.some(e => e.wave)) waveWon();
     }
-    if (visitors && !enemies.some(e => !e.wave)) { visitors = false; G.toast('The night visitors are gone. +coins'); }
+    if (visitors && !enemies.some(e => !e.wave && !e.camp)) { visitors = false; G.toast('The night visitors are gone. +coins'); }
   }
 
   // ---------------------------------------------------------------- friendly finds
@@ -756,6 +828,7 @@ export function createAdventure(G) {
     if (!G.active()) return;
     updateAir(dt);
     updateEnemies(dt);
+    updateCamps(dt);
     updateFinds(dt);
     updateTrader(dt);
     updateBuddy(dt);
@@ -764,6 +837,7 @@ export function createAdventure(G) {
   }
   // leaving a world: clear everything that lives in it
   function reset() {
+    for (const c of [...camps]) removeCamp(c);
     for (const e of [...enemies]) removeEnemy(e);
     for (const f of [...finds]) removeFind(f);
     for (const s of shots) scene.remove(s.mesh); shots.length = 0;
@@ -772,7 +846,7 @@ export function createAdventure(G) {
   }
   function sleep() {
     const s = S(), len = DAY[W()];
-    if (wave || enemies.length) { G.toast('You cannot sleep with creatures nearby.'); return false; }
+    if (wave || enemies.some(e => !e.camp || e.aggro)) { G.toast('You cannot sleep with creatures nearby.'); return false; }
     if (!len) { G.toast('There is no night here: the star never sets. Your bed is set as home.'); return false; }
     if (daylight > 0.5) { G.toast('You can only sleep at night. Your bed is set as home.'); return false; }
     s.clock = len * 0.02; G.toast('You slept until morning.');
@@ -781,7 +855,7 @@ export function createAdventure(G) {
 
   return {
     update, reset, attack, pick, scan, startWave, canStart, sleep, hurt, heal, catchFind,
-    sunDir, get daylight() { return daylight; }, isDark,
+    sunDir, get daylight() { return daylight; }, isDark, get camps() { return camps; }, campSoon: () => { campT = 0; },
     get wave() { return wave; }, get enemies() { return enemies; }, get finds() { return finds; },
     get flash() { return flashT; }, weapon, spawnEnemy, spawnFind,
     lost: () => S().lost, dayLength: () => DAY[W()] || 0, removeFind,

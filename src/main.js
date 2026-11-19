@@ -118,6 +118,7 @@ const freshState = () => ({
   hp: MAX_HP, air: MAX_AIR, boxes: {}, home: null, lost: null,
 });
 let state = freshState();
+let team = null;   // { code, world } when playing a world together
 let inCamp = false, friends = null, quests = null, pets = null;
 let world, player;
 let playing = false, paused = false;
@@ -167,7 +168,7 @@ function applyLook(id) {
 function setupWorld(save, arriving = false) {
   if (world) for (const c of world.chunks.values()) if (c.mesh) { scene.remove(c.mesh); c.mesh.geometry.dispose(); }
   world = new World(look, inCamp ? 777 : undefined);
-  if (inCamp) { const set0 = world.set.bind(world); world.set = (x, y, z, id, rec = true) => { set0(x, y, z, id, rec); if (rec && friends) friends.blockChanged(x, y, z, id); }; }
+  if (inCamp || team) { const set0 = world.set.bind(world); world.set = (x, y, z, id, rec = true) => { set0(x, y, z, id, rec); if (rec && friends) friends.blockChanged(x, y, z, id); }; }
   state = save ? Object.assign(freshState(), save.state) : freshState();
   homeLv = 0; homeT = 0;
   if (inCamp && !save) { state.fixed = { patch: true, engine: true, fueltank: true, computer: true, launch: false }; state.won = true; state.arrived = true; campKit(); }
@@ -345,7 +346,8 @@ function stepNow() {
   const ready = PARTS.find(p => !f[p.id] && has(p.id) > 0);
   if (ready) return { text: `Your ${ready.name} is made! Walk to the ship (follow the arrow) and press F to fit it.`, ship: true };
   if (PARTS.every(p => f[p.id])) return { text: 'Everything is fixed! Walk to the ship, press F and take off.', ship: true };
-  const part = PARTS.find(p => !f[p.id]);
+  const jobs = myJobs();
+  const part = jobs.find(p => !f[p.id]) || PARTS.find(p => !f[p.id]);
   const r = RECIPES.find(x => x.out === part.id);
   const miss = missingFor(r.need);
   // crystal needs the Iron drill first
@@ -437,7 +439,7 @@ function renderGoal() {
     $('goal').innerHTML = `<h3>${look.planet.name}: wave ${done} of ${LAST_WAVE}</h3><ul><li>Stage: ${st.name} (waves ${st.from} to ${st.to})</li><li>Weapon: ${adv.weapon().name}</li></ul><div class="tip">${says(nextTip())}</div>`;
     return;
   }
-  $('goal').innerHTML = `<h3>Fix your ship</h3><ul>${items}</ul><div class="tip next"><b>Next:</b> ${says(nextTip())}</div>`;
+  $('goal').innerHTML = `<h3>Fix your ship${team ? ` · team ${team.code}` : ''}</h3><ul>${items}</ul>${team ? `<div class="tip">Team of ${teamSize()}. Your jobs: <b>${myJobs().map(p => p.name).join(', ')}</b></div>` : ''}<div class="tip next"><b>Next:</b> ${says(nextTip())}</div>`;
 }
 
 // ---------------- bag and crafting ----------------
@@ -514,6 +516,7 @@ function install(id) {
   world.setStructure(shipBlocks(state.fixed));
   sfx.install();
   toast(`${ITEMS[id].name} fitted!`);
+  if (team) friends.setInfo('ship', { [id]: true });
   renderShip(); renderGoal(); writeSave();
 }
 
@@ -1004,7 +1007,7 @@ function renderBook() {
   const ids = WORLD_ORDER.filter(id => profile.visited[id]);
   if (!bookWorld || (!ids.includes(bookWorld) && bookWorld[0] !== '_')) bookWorld = '_quests';
   const dq = dailyQuests(), ready = dq.quests.filter(q => q.have >= q.need && !q.claimed).length;
-  $('bookTabs').innerHTML = [['_quests', `Daily quests${ready ? ` (${ready}!)` : ''}`], ['_badges', 'Badges'], ['_pets', 'Pets'], ['_looks', 'Looks'], ...ids.map(id => [id, planetById(id).name])]
+  $('bookTabs').innerHTML = [['_quests', `Daily quests${ready ? ` (${ready}!)` : ''}`], ['_badges', 'Badges'], ['_shop', 'Shop'], ['_pets', 'Pets'], ['_looks', 'Looks'], ...ids.map(id => [id, planetById(id).name])]
     .map(([id, n]) => `<button class="${id === bookWorld ? 'on' : ''}" data-w="${id}">${n}</button>`).join('');
   $('bookTabs').querySelectorAll('button').forEach(b => b.onclick = () => { bookWorld = b.dataset.w; renderBook(); });
   if (bookWorld === '_quests') {
@@ -1017,6 +1020,35 @@ function renderBook() {
       btn.disabled = q.claimed || q.have < q.need; btn.onclick = () => { quests.claim(i); renderBook(); };
       row.appendChild(btn); $('bookList').appendChild(row);
     });
+    return;
+  }
+  if (bookWorld === '_shop') {
+    profile.ups = profile.ups || {};
+    $('bookSum').textContent = `Spend your coins on upgrades. Win waves, clear imp camps and finish daily quests for more. You have ${profile.coins} coins.`;
+    $('bookList').innerHTML = '';
+    const lvl = (k) => profile.ups[k] || 0;
+    const wLvl = profile.gear.weapon ? ITEMS[profile.gear.weapon].weapon : 0;
+    const nextW = [['club', 40], ['sword', 150], ['csword', 450], ['spear', 1000], ['blade', 2200]].find(([k]) => ITEMS[k].weapon > wLvl);
+    const rows = [];
+    if (nextW) rows.push({ name: ITEMS[nextW[0]].name, note: `Weapon level ${ITEMS[nextW[0]].weapon}: hits for ${ITEMS[nextW[0]].dmg}. Opens waves up to ${ITEMS[nextW[0]].weapon * 10}.`, cost: nextW[1], buy: () => { profile.gear.weapon = nextW[0]; } });
+    const step = (k, name, note, costs, max) => { const l = lvl(k); rows.push({ name: `${name} ${l < max ? l + 1 : l}/${max}`, note, cost: l < max ? costs[l] : null, buy: () => { profile.ups[k] = l + 1; } }); };
+    step('dmg', 'Sharper weapon', '+12% damage with any weapon, each level.', [120, 300, 650, 1300, 2600], 5);
+    step('armor', 'Tougher suit', 'Take 8% less damage, each level.', [120, 300, 650, 1300, 2600], 5);
+    step('dig', 'Faster digging', 'Dig 20% faster, each level.', [100, 260, 600], 3);
+    const sh = profile.ship;
+    if (sh.tank < 2) rows.push({ name: 'Bigger fuel tank (ship)', note: 'Holds 6 fuel cells. Needed for the far stars.', cost: 700, buy: () => { sh.tank = 2; } });
+    if (sh.engine < 2) rows.push({ name: 'Strong engine (ship)', note: 'Reach Proxima b. (Or make it with a Dragon scale.)', cost: 1500, buy: () => { sh.engine = 2; } });
+    else if (sh.engine < 3) rows.push({ name: 'Star engine (ship)', note: 'Reach TRAPPIST-1e and LHS 1140 b.', cost: 3500, buy: () => { sh.engine = 3; } });
+    rows.push({ name: '3 Fuel cells', note: 'Fuel for flying between worlds.', cost: 90, buy: () => { give('fuelcell', 3, true); } });
+    rows.push({ name: 'Gem', note: 'Rare and shiny. The Trader pays well, and some upgrades need it.', cost: 150, buy: () => { give('gem', 1, true); } });
+    for (const r of rows) {
+      const row = document.createElement('div'); row.className = 'quest' + (r.cost == null ? ' done' : '');
+      row.innerHTML = `<div>${r.name} <small class="sub">${r.note}</small></div><div><small class="sub">${r.cost == null ? 'Maxed' : r.cost + ' coins'}</small></div>`;
+      const btn = document.createElement('button'); btn.textContent = r.cost == null ? 'Done' : 'Buy';
+      btn.disabled = r.cost == null || profile.coins < r.cost;
+      btn.onclick = () => { if (profile.coins < r.cost) return; profile.coins -= r.cost; r.buy(); saveProfile(); writeSave(); sfx.coin(); toast(`Bought: ${r.name.replace(/ \d+\/\d+$/, '')}!`); renderStatus(); renderGoal(); renderBook(); };
+      row.appendChild(btn); $('bookList').appendChild(row);
+    }
     return;
   }
   if (bookWorld === '_looks') {
@@ -1074,7 +1106,7 @@ function renderBook() {
   rows.push(['wreck', 'Buried wreck', 'Old supply box']);
   rows.push(['trader', 'Trader', 'Visitor']);
   rows.push(['trap', 'Spike trap', 'A creature stepped on your trap']);
-  for (const k of Object.keys(ENEMIES)) rows.push([k, ENEMIES[k].name, 'Wave creature']);
+  for (const k of Object.keys(ENEMIES)) rows.push([k, ENEMIES[k].name, ENEMIES[k].camp ? 'Villain camp' : 'Wave creature']);
   for (const n of Object.keys(BIG)) rows.push(['big-' + BIG[n], 'Big ' + ENEMIES[BIG[n]].name.toLowerCase(), `Mini boss, wave ${n}`]);
   rows.push(['dragon', DRAGONS[w].name, 'Dragon, wave 50']);
   const rb = profile.book.rigs || {};
@@ -1087,7 +1119,7 @@ function renderBook() {
 
 // ---------------- panels and pointer lock ----------------
 let dragMode = false, lockFails = 0;
-const panels = ['setPanel', 'chatPanel', 'giftPanel', 'buildPanel', 'homePanel', 'adPanel', 'rigPanel', 'bag', 'shipPanel', 'pause', 'win', 'title', 'beaconPanel', 'forgePanel', 'boxPanel', 'shopPanel', 'mapPanel', 'bookPanel', 'fallPanel', 'rewardPanel', 'travel'];
+const panels = ['teamPanel', 'setPanel', 'chatPanel', 'giftPanel', 'buildPanel', 'homePanel', 'adPanel', 'rigPanel', 'bag', 'shipPanel', 'pause', 'win', 'title', 'beaconPanel', 'forgePanel', 'boxPanel', 'shopPanel', 'mapPanel', 'bookPanel', 'fallPanel', 'rewardPanel', 'travel'];
 const panelOpen = () => panels.some(id => !$(id).classList.contains('hide'));
 function requestLock() {
   if (dragMode) return;
@@ -1202,6 +1234,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyV') toggleRover();
   if (e.code === 'KeyY') toggleView();
   if (e.code === 'KeyU') backToTop();
+  if (e.code === 'KeyH' && launchT < 0) { bookWorld = '_shop'; openPanel('bookPanel'); }
   if (/^Digit[1-9]$/.test(e.code)) { state.sel = +e.code[5] - 1; renderHotbar(); }
   if (e.code === 'KeyG' && (params.has('debug') || profile.free)) { player.fly = !player.fly; toast(player.fly ? 'Flying: Space to go up, C to go down. G to stop.' : 'Flying off.'); }
   if (e.code === 'Space') e.preventDefault();
@@ -1321,6 +1354,7 @@ function setupTouch() {
   hold('tScan', () => adv.scan(), () => { });
   tap('tRover', () => toggleRover());
   tap('tView', () => toggleView());
+  tap('tShop', () => { if (launchT < 0) { bookWorld = '_shop'; openPanel('bookPanel'); } });
   $('goal').addEventListener('click', () => $('goal').classList.toggle('open'));
   document.querySelectorAll('.close').forEach(b => { b.textContent = 'Close'; });
   const fs = $('fullBtn');
@@ -1366,7 +1400,7 @@ function updateDig(dt) {
     if (!dig.denied) { dig.denied = true; sfx.deny(); toast(`You need ${toolForTier(b.tier)} to dig ${b.name.toLowerCase()}`); }
     return;
   }
-  dig.p += dt * TOOL_SPEED[tier] / b.time;
+  dig.p += dt * TOOL_SPEED[tier] / b.time * (1 + 0.2 * (profile.ups && profile.ups.dig || 0));
   dig.hitT -= dt;
   if (dig.hitT <= 0) { dig.hitT = 0.22; sfx.hit(b.time > 1.5); bits.chips(hit.x, hit.y, hit.z, hit.nx, hit.ny, hit.nz, colorsOf(hit.id), 4); }
   crackBox.visible = true; crackBox.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
@@ -1403,7 +1437,7 @@ function openSupply() {
 }
 function useAction() {
   if (launchT >= 0) return;
-  const fr = inCamp && friends.friendAt(eyeV, fwd);
+  const fr = (inCamp || team) && friends.friendAt(eyeV, fwd);
   if (fr && (!hit || fr.t < hit.t)) { openGift(fr.o); return; }
   if (aim && (!hit || aim.t < hit.t)) {
     if (aim.kind === 'trader') { openPanel('shopPanel'); return; }
@@ -1531,7 +1565,7 @@ function frame() {
   eyeV.copy(camera.position);
   hit = playing && launchT < 0 ? world.raycast(eyeV, fwd, 5.5) : null;
   aim = playing && launchT < 0 ? adv.pick(eyeV, fwd, 6) : null;
-  const frAim = inCamp && playing && friends.friendAt(eyeV, fwd);
+  const frAim = (inCamp || team) && playing && friends.friendAt(eyeV, fwd);
   updateBody(dt, fwd);
   if (frAim && (!hit || frAim.t < hit.t)) {
     outline.visible = false;
@@ -1731,7 +1765,7 @@ function landOn(id, fresh) {
 applyLook(picked);
 setupWorld(loadSave());
 renderWorlds();
-$('worldBtn').onclick = () => { writeSave(); if (inCamp) leaveCampMode(); playing = false; $('hud').classList.add('hide'); $('touch').classList.remove('on'); renderWorlds(); openPanel('title'); };
+$('worldBtn').onclick = () => { writeSave(); if (inCamp) leaveCampMode(); if (team) leaveTeamMode(); playing = false; $('hud').classList.add('hide'); $('touch').classList.remove('on'); renderWorlds(); openPanel('title'); };
 function renderFree() {
   const t = `Free roam: ${profile.free ? 'on' : 'off'}`;
   $('freeBtn').textContent = t; $('freeBtn2').textContent = t;
@@ -1746,6 +1780,7 @@ for (const id of ['freeBtn', 'freeBtn2']) $(id).onclick = () => {
 renderFree();
 function start() {
   if (inCamp) leaveCampMode();
+  if (team) leaveTeamMode();
   if (!look || look.planet.id !== picked || SAVE_KEY !== saveKey(picked)) landOn(picked, false);
   const got = accrueAll();
   if (Object.keys(got).length) setTimeout(() => banner('Welcome back!', `Your mining rigs dug ${rigSummary(got)} while you were away. Empty them to collect.`), 600);
@@ -1764,6 +1799,57 @@ function campKit() {
   const kit = { drill: 1, sheet: 20, rock: 60, brick: 24, castle: 24, crystal: 12, ice: 12, metal: 8, lamp: 6, door: 2, window: 6, flag: 1, garden: 2 };
   for (const [k, n] of Object.entries(kit)) give(k, n, true);
 }
+// ---- team play: the same world for up to 3 friends, with the ship jobs split between them
+function teamSize() { return team ? Math.max(1, Math.min(3, friends.team().length)) : 1; }
+function myJobs() {
+  if (!team) return PARTS;
+  const t = friends.team(), n = Math.max(1, Math.min(3, t.length)), me = Math.max(0, t.findIndex(p => p.me));
+  return PARTS.filter((p, i) => i % n === me % n);
+}
+function applyTeamShip(d) {
+  if (!state || !team) return;
+  let changed = false;
+  for (const p of PARTS) if (d[p.id] && !state.fixed[p.id]) { state.fixed[p.id] = true; changed = true; toast(`Your team fitted the ${p.name}!`); }
+  if (changed) { world.setStructure(shipBlocks(state.fixed)); sfx.install(); renderGoal(); writeSave(); }
+}
+async function enterTeamMode(code, worldId, isNew = false) {
+  writeSave();
+  code = code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+  if (code.length < 4) { $('teamNote').textContent = 'A team code has 4 letters.'; return; }
+  const me = team = { code, world: worldId };
+  applyLook(worldId);
+  SAVE_KEY = saveKey(`team-${code}`);
+  setupWorld(loadSave());
+  closePanels(false);
+  const res = await friends.enterCamp({ room: `team-${code}`, coll: `team/${code}/chunks`, info: `team/${code}/info`, onInfo: (id, d) => { if (!team || team !== me) return; if (id === 'ship') applyTeamShip(d); else if (id === 'world' && d.w && d.w !== team.world) { if (team.ready) moveTeam(d.w); else team.moveTo = d.w; } }, max: 3, where: worldId });
+  if (team !== me) return;
+  me.ready = true;
+  if (me.moveTo && res !== 'full') { moveTeam(me.moveTo); return; }
+  if (res === 'full') { leaveTeamMode(); toast('That team is full (3 players).'); openPanel('title'); return; }
+  if (isNew) friends.setInfo('world', { w: worldId });
+  $('worldName').textContent = `${planetById(worldId).name} · team ${code}`;
+  document.body.classList.add('teamon');
+  initAudio(); playMusic(worldId); playing = true;
+  $('hud').classList.remove('hide'); $('touch').classList.add('on');
+  renderHotbar(); renderGoal(); resume();
+  banner(`Team ${code}`, `Tell your friends the code ${code}. Your jobs: ${myJobs().map(p => p.name).join(', ')}. Everything is shared.`);
+  G.track('camp');
+}
+function moveTeam(w) {
+  toast(`This team plays on ${planetById(w).name}. Taking you there.`);
+  const c = team.code; leaveTeamMode(); enterTeamMode(c, w);
+}
+function leaveTeamMode() {
+  if (!team) return;
+  writeSave(); friends.leaveCamp(); team = null;
+  document.body.classList.remove('teamon');
+  SAVE_KEY = saveKey(picked); applyLook(picked); setupWorld(loadSave());
+  friends.where(picked);
+}
+$('teamBtn').onclick = () => { $('teamWorld').textContent = planetById(picked).name; $('teamNote').textContent = friends.connected ? '' : 'Team play needs the online version of the game (the Claude link).'; openPanel('teamPanel'); };
+$('teamClose').onclick = () => { closePanels(false); openPanel('title'); };
+$('teamNew').onclick = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = ''; for (let i = 0; i < 4; i++) c += A[Math.floor(Math.random() * A.length)]; enterTeamMode(c, picked, true); };
+$('teamJoin').onclick = () => enterTeamMode($('teamCode').value, picked);
 function enterCampMode() {
   writeSave();
   inCamp = true;
@@ -1783,7 +1869,7 @@ function leaveCampMode() {
   writeSave();
   friends.leaveCamp(); inCamp = false;
   document.body.classList.remove('camp');
-  applyLook(picked); setupWorld(loadSave());
+  SAVE_KEY = saveKey(picked); applyLook(picked); setupWorld(loadSave());
   friends.where(picked);
 }
 let giftTo = null;
@@ -1816,6 +1902,7 @@ friends = createFriends({ suit: () => profile.suit || null,
   gotGift: (k, n, from) => { if (!inCamp) return; give(k, n, true); sfx.catch(); banner('A gift!', `${from} gave you ${n} ${ITEMS[k].name}.`); writeSave(); },
   onChat: (log) => { $('chatLog').innerHTML = log.map(l => `<div>${l.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</div>`).join(''); $('chatLog').classList.remove('hide'); clearTimeout(renderChat.t); renderChat.t = setTimeout(() => $('chatLog').classList.add('hide'), 9000); },
   onLobby: () => renderFriendsBox(),
+  onTeam: () => { if (team && state) renderGoal(); },
 });
 async function renderFriendsBox() {
   const list = await friends.lobbyList();
@@ -1998,5 +2085,5 @@ window.__game = {
   start: () => { playing = true; $('hud').classList.remove('hide'); $('touch').classList.add('on'); for (const p of panels) $(p).classList.add('hide'); renderHotbar(); renderGoal(); },
   pending: () => updateChunks(50), landOn, get look() { return look; },
   hit: () => hit, mouse, keys, tch, TOUCH, dig, useAction, renderGoal, get launchT() { return launchT; },
-  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; },
+  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; },
 };
