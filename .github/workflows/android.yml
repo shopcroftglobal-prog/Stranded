@@ -1,0 +1,46 @@
+name: Android APK
+# Builds an Android app (APK) from the game in docs/index.html and attaches it to a release.
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: android-actions/setup-android@v3
+      - name: Make the app project
+        run: |
+          mkdir app && cd app
+          npm init -y >/dev/null
+          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          mkdir www && cp ../docs/index.html www/index.html
+          npx cap init Stranded com.shopcroft.stranded --web-dir www
+          npx cap add android
+          # landscape, full screen
+          sed -i 's|<activity|<activity android:screenOrientation="sensorLandscape"|' android/app/src/main/AndroidManifest.xml
+          npx cap sync android
+      - name: Build the APK
+        run: |
+          cd app/android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../../Stranded.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: Stranded-apk, path: Stranded.apk }
+      - name: Put it on the Releases page
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Stranded (latest Android build)
+          body: Download Stranded.apk below and open it on your Android phone. You may need to allow installing apps from your browser.
+          files: Stranded.apk
+          make_latest: true

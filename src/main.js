@@ -17,6 +17,11 @@ import { Player, EYE, PW, PH, physicsFor } from './player.js';
 import { buildSky, Cloud, Bits } from './effects.js';
 import { PLANETS, planetById, gravityWords, tempWords, starWords, distanceWords, jumpWords } from './planets.js';
 import { worldParams } from './looks.js';
+import { createWater } from './water.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { shipBlocks, SMOKE_POINTS, DEBRIS, SHIP_BASE } from './ship.js';
 import { initAudio, sfx, setVolume, setMusic, setMood, startMusic, restartMusic } from './audio.js';
 import { createAdventure, MAX_HP, MAX_AIR, LAST_WAVE, STAGES, stageOf, DRAGONS, FINDS, RARE_OF } from './adventure.js';
@@ -53,6 +58,15 @@ renderer.shadowMap.enabled = !LIGHT;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
+// glow: bright things (crystals, lamps, the sun, lava) softly shine. Off on the Fast setting.
+function setupGlow() {
+  if (composer) return;
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.5, 0.82);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+}
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020106);
@@ -75,7 +89,9 @@ scene.add(sun, sun.target);
 const lamp = new THREE.SpotLight(0xffe6c8, 0, 28, 0.8, 0.55, 1.0);
 lamp.position.set(0, -0.2, 0.1);
 camera.add(lamp); camera.add(lamp.target); lamp.target.position.set(0, -0.3, -5);
-let sky = null;
+let sky = null, water = null, fogBase = 0;
+let composer = null, bloom = null;
+water = createWater(scene);
 
 const atlas = buildAtlas();
 const mat = new THREE.MeshLambertMaterial({ map: atlas.map, emissiveMap: atlas.emissiveMap, emissive: 0xffffff, emissiveIntensity: 0.9, vertexColors: true, alphaTest: 0.5 });
@@ -127,8 +143,9 @@ function applyLook(id) {
   if (sky) { scene.remove(sky); sky.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
   sky = buildSky(scene, k, SUN_DIR, look.planet);
   if (adv) adv.reset();
-  scene.fog.color.set(k.fog);
+  scene.fog.color.set(k.fog); fogBase = k.fog;
   scene.background.set(k.top);
+  if (water) water.setLevel(look.terrain.liquid ? look.terrain.sea + 0.9 : null, look.planet.id === 'lhs1140b' ? 0x2f6688 : 0x23889a);
   sun.color.set(k.sun); sun.intensity = k.sunI;
   hemi.color.set(k.hemi[0]); hemi.groundColor.set(k.hemi[1]); hemi.intensity = k.hemi[2];
   amb.color.set(k.amb[0]); amb.intensity = k.amb[1];
@@ -1213,6 +1230,7 @@ window.addEventListener('wheel', (e) => {
 }, { passive: true });
 window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
+  if (composer) composer.setSize(window.innerWidth, window.innerHeight);
   fitCamera();
 });
 window.addEventListener('beforeunload', writeSave);
@@ -1562,6 +1580,14 @@ function frame() {
   adv.update(dt);
   if (playing) updateHome(dt);
   sky.position.copy(camera.position);
+  if (water) {
+    water.update(dt, camera.position);
+    player.waterY = water.level;
+    const under = water.under(camera.position);
+    $('underwater').classList.toggle('on', under && playing);
+    if (under) { scene.fog.color.set(0x0e4a5a); scene.fog.near = 1; scene.fog.far = 22; }
+    else if (scene.fog.far === 22) { scene.fog.color.set(fogBase); scene.fog.near = RENDER_R * CS * 0.35; scene.fog.far = RENDER_R * CS - 4; }
+  }
   nightCover.position.copy(camera.position);
   sun.position.copy(player.pos).addScaledVector(adv.sunDir.y > 0.02 ? adv.sunDir : new THREE.Vector3(adv.sunDir.x, 0.02, adv.sunDir.z), 80);
   sun.target.position.set(player.pos.x, player.pos.y, player.pos.z);
@@ -1591,7 +1617,7 @@ function frame() {
   }
   if (showFps) { fpsT += dt; fpsN++; if (fpsT > 0.5) { $('fps').textContent = `${Math.round(fpsN / fpsT)} fps`; fpsT = 0; fpsN = 0; } }
 
-  renderer.render(scene, camera);
+  if (useGlow()) { setupGlow(); composer.render(); } else renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
 
@@ -1866,11 +1892,13 @@ let moodNow = null;
 function playMusic(where) { applySettings(); const m = MOODS[where] || 'calm'; if (m === moodNow) { startMusic(); return; } moodNow = m; setMood(m); restartMusic(); }
 // ---- settings
 function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { } }
+function useGlow() { return settings.quality !== 'low' && !race.active; }
 function applySettings() {
   setVolume(settings.sound); setMusic(settings.music);
   const q = QUALITY[settings.quality];
   if (!params.get('r')) RENDER_R = q.r;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.px)); renderer.setSize(window.innerWidth, window.innerHeight, false);
+  if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(window.innerWidth, window.innerHeight); }
   scene.fog.near = RENDER_R * CS * 0.35; scene.fog.far = RENDER_R * CS - 4;
 }
 function renderSettings() {

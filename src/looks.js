@@ -97,8 +97,8 @@ export function worldParams(id) {
   if (id === 'moon') { t.glassRims = true; t.floorIce = 0.6; }
   if (id === 'europa') { t.craterChance = 0.18; t.cracks = true; t.iceShell = 7; t.amp *= 0.35; t.ridge *= 0.4; t.rocks = 0.5; }
   if (id === 'proxima') { t.freq = 0.016; t.amp *= 1.35; t.ridge *= 1.4; }
-  if (r.water && id === 'trappist1e') { t.sea = 29; t.rocks = 0.6; }
-  if (id === 'lhs1140b') { t.sea = 29; t.snowCaps = true; t.rocks = 0.6; }
+  if (r.water && id === 'trappist1e') { t.sea = 29; t.rocks = 0.6; t.liquid = true; }
+  if (id === 'lhs1140b') { t.sea = 29; t.snowCaps = true; t.rocks = 0.6; t.liquid = true; }
 
   // Ores follow density (iron, gold) and cold (ice). Thresholds: lower = more common.
   const ores = {

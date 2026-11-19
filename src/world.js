@@ -134,9 +134,15 @@ export class World {
       // frozen seas fill the low ground
       let surf = top;
       if (T.sea && top < T.sea && col.d0 > 12) {
-        for (let y = top + 1; y <= T.sea; y++) data[idx(lx, y, lz)] = B.ICE;
-        if (T.snowCaps && hash3(x, 3, z, 18) > 0.3) data[idx(lx, T.sea, lz)] = B.REDDIRT;
-        surf = T.sea;
+        if (T.liquid) {
+          // a real sea: open water, with floating ice here and there
+          const floe = n.n3(x * 0.08, 7.3, z * 0.08);
+          if (floe > 0.42 || (T.snowCaps && floe > 0.3)) { data[idx(lx, T.sea, lz)] = B.ICE; surf = T.sea; }
+        } else {
+          for (let y = top + 1; y <= T.sea; y++) data[idx(lx, y, lz)] = B.ICE;
+          if (T.snowCaps && hash3(x, 3, z, 18) > 0.3) data[idx(lx, T.sea, lz)] = B.REDDIRT;
+          surf = T.sea;
+        }
       }
       // loose rocks lying on the ground (more of them near the ship, so the start is quick)
       const near = col.d0 > 13 && col.d0 < 40;

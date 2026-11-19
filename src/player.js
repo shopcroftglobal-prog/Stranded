@@ -45,7 +45,16 @@ export class Player {
     const accel = this.rover ? (this.onGround ? 3 : 1) : this.onGround ? 14 : 4;
     v.x += (mx * sp - v.x) * Math.min(1, accel * dt);
     v.z += (mz * sp - v.z) * Math.min(1, accel * dt);
-    if (this.fly) {
+    const swim = this.waterY != null && !this.fly && p.y + 0.8 < this.waterY;
+    if (swim) {
+      // in water: slow, floaty, Space swims up
+      v.x *= 1 - Math.min(1, dt * 3); v.z *= 1 - Math.min(1, dt * 3);
+      v.y += (input.jump ? 9 : -2.5) * dt; v.y *= 1 - Math.min(1, dt * 2.5);
+      v.y = Math.max(-3, Math.min(4.5, v.y));
+      if (input.jump && p.y + 1.6 > this.waterY) v.y = this.phys.jump * 0.85;   // hop out at the edge
+      this.swimming = true;
+    } else this.swimming = false;
+    if (swim) { /* handled above */ } else if (this.fly) {
       v.y = (input.jump ? 8 : 0) - (input.down ? 8 : 0);
     } else {
       if (input.jump && this.onGround) { v.y = this.phys.jump; this.onGround = false; ev.jumped = true; }
