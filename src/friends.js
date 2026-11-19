@@ -18,7 +18,8 @@ export function createFriends(ctx) {
   let campRoom = null, campOn = false;
   const others = new Map();          // peer -> { m, tag, bubble, pos, ... }
   const names = {};
-  let mySuit = SUITS[Math.floor(Math.random() * SUITS.length)];
+  const rndSuit = SUITS[Math.floor(Math.random() * SUITS.length)];
+  const mySuitNow = () => (ctx.suit && ctx.suit()) || rndSuit;
   let say = null, sayT = 0, lastSend = 0;
   const chatLog = [];
 
@@ -42,7 +43,7 @@ export function createFriends(ctx) {
   }
 
   // ---- lobby: who is online and where
-  function where(w) { if (room) room.presence({ w, s: mySuit }).catch(() => {}); }
+  function where(w) { if (room) room.presence({ w, s: mySuitNow() }).catch(() => {}); }
   function online() {
     if (!room) return [];
     return room.peers().filter(p => p.kind === 'viewer' && !p.sameTab);
@@ -172,7 +173,7 @@ export function createFriends(ctx) {
     if (campRoom && t - lastSend > 0.1) {
       lastSend = t;
       const moving = Math.hypot(pl.vel ? pl.vel.x : 0, pl.vel ? pl.vel.z : 0) > 0.5;
-      const pr = { p: [Math.round(pl.pos.x * 10) / 10, Math.round(pl.pos.y * 10) / 10, Math.round(pl.pos.z * 10) / 10, Math.round(pl.yaw * 100) / 100], s: mySuit, mv: moving ? 1 : 0 };
+      const pr = { p: [Math.round(pl.pos.x * 10) / 10, Math.round(pl.pos.y * 10) / 10, Math.round(pl.pos.z * 10) / 10, Math.round(pl.yaw * 100) / 100], s: mySuitNow(), mv: moving ? 1 : 0 };
       if (say) { pr.say = say; pr.sayT = sayT; }
       campRoom.presence(pr).catch(() => {});
     }

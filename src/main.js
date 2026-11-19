@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import * as rigsMod from './rigs.js';
 import { createRace } from './race.js';
 import { createFriends, PHRASES } from './friends.js';
-import { makeRover } from './characters.js';
+import { makeRover, makePilot, animate, SUITS } from './characters.js';
+const LOOKS = { suit: { sand: 0, sea: 100, sun: 100, berry: 250, frost: 250 }, rover: { sun: 0, sea: 150, berry: 150 } };
 import { createPets, caughtPets, PET_GIFTS } from './pets.js';
 import { createQuests, dailyQuests, questText, questCoins, BADGES } from './quests.js';
 import { HOME_R, LEVELS, COSY_LIST, comfort, levelOf, atHome, giftReady, claimGift, updateGardens, growTime } from './home.js';
@@ -884,7 +885,7 @@ function renderBook() {
   const ids = WORLD_ORDER.filter(id => profile.visited[id]);
   if (!bookWorld || (!ids.includes(bookWorld) && bookWorld[0] !== '_')) bookWorld = '_quests';
   const dq = dailyQuests(), ready = dq.quests.filter(q => q.have >= q.need && !q.claimed).length;
-  $('bookTabs').innerHTML = [['_quests', `Daily quests${ready ? ` (${ready}!)` : ''}`], ['_badges', 'Badges'], ['_pets', 'Pets'], ...ids.map(id => [id, planetById(id).name])]
+  $('bookTabs').innerHTML = [['_quests', `Daily quests${ready ? ` (${ready}!)` : ''}`], ['_badges', 'Badges'], ['_pets', 'Pets'], ['_looks', 'Looks'], ...ids.map(id => [id, planetById(id).name])]
     .map(([id, n]) => `<button class="${id === bookWorld ? 'on' : ''}" data-w="${id}">${n}</button>`).join('');
   $('bookTabs').querySelectorAll('button').forEach(b => b.onclick = () => { bookWorld = b.dataset.w; renderBook(); });
   if (bookWorld === '_quests') {
@@ -897,6 +898,31 @@ function renderBook() {
       btn.disabled = q.claimed || q.have < q.need; btn.onclick = () => { quests.claim(i); renderBook(); };
       row.appendChild(btn); $('bookList').appendChild(row);
     });
+    return;
+  }
+  if (bookWorld === '_looks') {
+    profile.owned = profile.owned || {};
+    $('bookSum').textContent = `Pick how you look. Others see your suit in the Friends' camp. Press Y to see yourself. You have ${profile.coins} coins.`;
+    $('bookList').innerHTML = '';
+    const rows = [
+      ...Object.entries(LOOKS.suit).map(([k, c]) => ['suit', k, `${SUITS[k].name} suit`, c]),
+      ...(profile.rover ? Object.entries(LOOKS.rover).map(([k, c]) => ['rover', k, `${{ sun: 'Sun', sea: 'Sea', berry: 'Berry' }[k]} Rover`, c]) : []),
+    ];
+    for (const [kind, k, name, cost] of rows) {
+      const key = kind + '_' + k, own = cost === 0 || profile.owned[key];
+      const on = kind === 'suit' ? (profile.suit || 'sand') === k : (profile.roverLook || 'sun') === k;
+      const row = document.createElement('div'); row.className = 'quest' + (on ? ' done' : '');
+      row.innerHTML = `<div>${name} <small class="sub">${on ? 'Wearing it' : own ? 'Yours' : cost + ' coins'}</small></div><div><i class="swatch" style="background:${kind === 'suit' ? SUITS[k].suit : { sun: '#e8b23c', sea: '#4e9690', berry: '#8a3a6e' }[k]}"></i></div>`;
+      const btn = document.createElement('button');
+      btn.textContent = on ? 'On' : own ? 'Use' : 'Buy';
+      btn.disabled = on || (!own && profile.coins < cost);
+      btn.onclick = () => {
+        if (!own) { profile.coins -= cost; profile.owned[key] = 1; sfx.coin(); renderStatus(); }
+        if (kind === 'suit') profile.suit = k; else profile.roverLook = k;
+        saveProfile(); toast(`${name} on!`); renderBook();
+      };
+      row.appendChild(btn); $('bookList').appendChild(row);
+    }
     return;
   }
   if (bookWorld === '_pets') {
@@ -1055,6 +1081,7 @@ window.addEventListener('keydown', (e) => {
   if (panelOpen()) return;
   if (e.code === 'KeyQ') adv.scan();
   if (e.code === 'KeyV') toggleRover();
+  if (e.code === 'KeyY') toggleView();
   if (/^Digit[1-9]$/.test(e.code)) { state.sel = +e.code[5] - 1; renderHotbar(); }
   if (e.code === 'KeyG' && (params.has('debug') || profile.free)) { player.fly = !player.fly; toast(player.fly ? 'Flying: Space to go up, C to go down. G to stop.' : 'Flying off.'); }
   if (e.code === 'Space') e.preventDefault();
@@ -1172,6 +1199,7 @@ function setupTouch() {
   tap('tFly', () => { if (!profile.free) return; player.fly = !player.fly; toast(player.fly ? 'Flying: hold Jump to go up. Tap Fly again to land.' : 'Flying off.'); });
   hold('tScan', () => adv.scan(), () => { });
   tap('tRover', () => toggleRover());
+  tap('tView', () => toggleView());
   $('goal').addEventListener('click', () => $('goal').classList.toggle('open'));
   document.querySelectorAll('.close').forEach(b => { b.textContent = 'Close'; });
   const fs = $('fullBtn');
@@ -1254,7 +1282,7 @@ function openSupply() {
 }
 function useAction() {
   if (launchT >= 0) return;
-  const fr = inCamp && friends.friendAt(camera.position, fwd);
+  const fr = inCamp && friends.friendAt(eyeV, fwd);
   if (fr && (!hit || fr.t < hit.t)) { openGift(fr.o); return; }
   if (aim && (!hit || aim.t < hit.t)) {
     if (aim.kind === 'trader') { openPanel('shopPanel'); return; }
@@ -1378,9 +1406,11 @@ function frame() {
 
   // what am I looking at
   camera.getWorldDirection(fwd);
-  hit = playing && launchT < 0 ? world.raycast(camera.position, fwd, 5.5) : null;
-  aim = playing && launchT < 0 ? adv.pick(camera.position, fwd, 6) : null;
-  const frAim = inCamp && playing && friends.friendAt(camera.position, fwd);
+  eyeV.copy(camera.position);
+  hit = playing && launchT < 0 ? world.raycast(eyeV, fwd, 5.5) : null;
+  aim = playing && launchT < 0 ? adv.pick(eyeV, fwd, 6) : null;
+  const frAim = inCamp && playing && friends.friendAt(eyeV, fwd);
+  updateBody(dt, fwd);
   if (frAim && (!hit || frAim.t < hit.t)) {
     outline.visible = false;
     $('target').textContent = `${frAim.o.name || 'A friend'} · right click (or Use) to give a gift`;
@@ -1644,7 +1674,7 @@ function renderChat() {
   $('chatList').innerHTML = '';
   for (const p of PHRASES) { const b = document.createElement('button'); b.textContent = p; b.onclick = () => { friends.chat(p); closePanels(); }; $('chatList').appendChild(b); }
 }
-friends = createFriends({
+friends = createFriends({ suit: () => profile.suit || null,
   scene, world: () => world, player: () => player, toast: (t) => toast(t),
   whereNow: () => (inCamp ? 'camp' : playing ? look.planet.id : 'title'),
   itemOk: (k) => !!ITEMS[k] && !ITEMS[k].tool && !ITEMS[k].part && !ITEMS[k].weapon && !ITEMS[k].shield && !ITEMS[k].tier,
@@ -1660,8 +1690,30 @@ async function renderFriendsBox() {
 pets = createPets({ scene, player: () => player, world: () => world, give: (k, n) => give(k, n, true), addCoins: (n) => { profile.coins += n; saveProfile(); renderStatus(); }, fillAir: () => { state.air = MAX_AIR; }, toast: (t) => toast(t), sfx, hidden: () => !playing || race.active });
 quests = createQuests({ toast: (t) => toast(t), banner: (a, b) => banner(a, b), give: (k, n) => give(k, n, true), sfx });
 
+// ---- seeing yourself: a camera behind you (Y, or View on phones) shows your pilot, pet and Rover
+const eyeV = new THREE.Vector3();
+let behind = false, body = null, bodySuit = null;
+function toggleView() { if (!playing || race.active) return; behind = !behind; toast(behind ? 'Camera behind you. Press Y again to look through your eyes.' : 'Looking through your eyes.'); }
+function updateBody(dt, dir) {
+  const want = profile.suit || 'sand';
+  if (!body || bodySuit !== want) { if (body) scene.remove(body); body = makePilot(want); bodySuit = want; scene.add(body); }
+  const show = behind && playing && launchT < 0 && !race.active;
+  body.visible = show;
+  held.visible = held.visible && !show;
+  if (!show) return;
+  const sp = Math.hypot(player.vel.x, player.vel.z);
+  body.position.set(player.pos.x, player.pos.y + (player.rover ? 0.45 : 0), player.pos.z);
+  body.rotation.y = player.yaw + Math.PI;
+  animate(body, clock.elapsedTime, player.rover ? 0 : Math.min(1, sp / 4));
+  // pull the camera back, but not through walls
+  const back = dir.clone().multiplyScalar(-1);
+  const wall = world.raycast(eyeV, back, 4.5);
+  const dist = Math.max(0.6, Math.min(4, wall ? wall.t - 0.35 : 4));
+  camera.position.copy(eyeV).addScaledVector(back, dist); camera.position.y += 0.3;
+  camera.updateMatrixWorld();
+}
 // ---- the Rover: hop in and drive. It climbs one block at a time and goes about three times walking speed.
-let roverM = null;
+let roverM = null, roverLookNow = null;
 if (profile.rover) document.body.classList.add('hasrover');
 function toggleRover() {
   if (!playing || race.active || panelOpen()) return;
@@ -1669,13 +1721,14 @@ function toggleRover() {
   if (player.fly) return;
   player.rover = !player.rover;
   if (player.rover) {
-    if (!roverM) { roverM = makeRover('sun'); scene.add(roverM); }
+    if (!roverM) { roverM = makeRover(profile.roverLook || 'sun'); roverLookNow = profile.roverLook || 'sun'; scene.add(roverM); }
     roverM.visible = true; sfx.craft();
     toast(TOUCH ? 'Driving! Push the pad up to go, left and right to turn. Tap Drive to get out.' : 'Driving! W to go, S to back up, A and D to turn. V to get out.');
     G.track('drive');
   } else { if (roverM) roverM.visible = false; toast('You hopped out of the Rover.'); }
 }
 function updateRover(dt) {
+  if (roverM && roverLookNow !== (profile.roverLook || 'sun')) { scene.remove(roverM); roverM = makeRover(profile.roverLook || 'sun'); roverLookNow = profile.roverLook || 'sun'; scene.add(roverM); roverM.visible = false; }
   if (!roverM) return;
   if (!player.rover || !playing || race.active) { roverM.visible = false; if (!playing || race.active) player.rover = false; return; }
   roverM.visible = true;
@@ -1750,5 +1803,5 @@ window.__game = {
   start: () => { playing = true; $('hud').classList.remove('hide'); $('touch').classList.add('on'); for (const p of panels) $(p).classList.add('hide'); renderHotbar(); renderGoal(); },
   pending: () => updateChunks(50), landOn, get look() { return look; },
   hit: () => hit, mouse, keys, tch, TOUCH, dig, useAction, renderGoal, get launchT() { return launchT; },
-  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, makeRover,
+  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, makeRover, toggleView, get behind() { return behind; },
 };

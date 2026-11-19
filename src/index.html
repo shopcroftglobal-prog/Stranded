@@ -266,6 +266,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
 #guide { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); background: rgba(26,9,5,0.85); border: 2px solid #ffd060; padding: 8px 16px; text-align: center; font-size: 17px; max-width: min(520px, 90vw); pointer-events: none; }
 #guide small { display: block; color: #ffd060; font-size: 12px; }
 #bookList .quest { grid-column: 1 / -1; }
+.swatch { display: inline-block; width: 22px; height: 22px; border: 2px solid #1a0905; }
 .quest { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 6px 8px; border: 1px solid #4a2416; margin: 4px 0; }
 .quest .qbar { width: 90px; height: 8px; background: #1a0905; border: 1px solid #4a2416; position: relative; } .quest .qbar i { position: absolute; left: 0; top: 0; bottom: 0; background: #7dff9a; }
 .quest.done { border-color: #7dff9a; } .badge { display: grid; grid-template-columns: 34px 1fr; gap: 8px; align-items: center; padding: 4px; opacity: 0.45; } .badge.got { opacity: 1; }
@@ -328,7 +329,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <button class="tbtn" id="tPlace">Use</button>
   <button class="tbtn" id="tScan">Scan</button>
   <button class="tbtn" id="tRover">Drive</button>
-  <div id="tmenu"><button id="tBag">Bag</button><button id="tBook">Book</button><button id="tChat">Say</button><button id="tFly">Fly</button><button id="tShip" class="far">Ship</button><button id="tPause">II</button></div>
+  <div id="tmenu"><button id="tBag">Bag</button><button id="tBook">Book</button><button id="tChat">Say</button><button id="tFly">Fly</button><button id="tView">View</button><button id="tShip" class="far">Ship</button><button id="tPause">II</button></div>
 </div>
 
 <div id="lockmsg" class="panel hide">Click to look around</div>
