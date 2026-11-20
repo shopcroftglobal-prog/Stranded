@@ -3,6 +3,10 @@
 Your ship came down hard. Pick a real world to crash on, dig, make tools, build the four missing parts and fly away.
 
 
+## New: see your pilot dig
+
+The camera now sits just over your pilot's right shoulder, so you watch them walk, swing their pickaxe or drill (it is in their hand) and fight. Each chop lands as the chips fly. The aim is still the cross in the middle of the screen, and you reach as far as before. Press **Y** (or **View** on phones) to look through your eyes instead; the game remembers your choice. Add `?eyes` to the link to start that way.
+
 ## New in steps 3 to 7
 
 - **Star map** (ship panel after the ship is fixed): fly between the six worlds. Trips cost Fuel cells (4 ice + 1 purple crystal). The Moon and Europa need only the repaired engine. Proxima b needs the Strong engine (1 Dragon scale). TRAPPIST-1e and LHS 1140 b need the Star engine (2 Dragon scales) and the Bigger fuel tank. Your bag flies with you. A world unlocks once you have been there.
@@ -70,6 +74,7 @@ Open **play.html** in Chrome, Edge or Firefox (double-click it; no install, work
 | Choose a block | 1 to 9, or the mouse wheel |
 | Bag and making things | E |
 | Fix the ship | F when you're next to it |
+| See your pilot, or look through your eyes | Y (View on phones) |
 | Pause | Esc |
 
 The game saves by itself in your browser. "Start over" is in the pause menu.
