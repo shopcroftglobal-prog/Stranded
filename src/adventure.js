@@ -615,6 +615,8 @@ export function createAdventure(G) {
       }
       if (e.glow > 0) e.glow -= dt;
       // keep them near you
+      // stuck in a hole (or up on a ledge) right next to you where nobody can reach: hop out nearby
+      if (!e.flies && !e.boss && Math.abs(dy) > 1.8 && flat < 8) { e.low = (e.low || 0) + dt; if (e.low > 3) { const s2 = ringSpot(4, 7); e.pos.set(s2.x, s2.y, s2.z); e.vy = 0; e.low = 0; burst(s2.x, s2.y + 0.5, s2.z, 0xd8c8b0); } } else e.low = 0;
       if (flat > 45 && !e.camp) { e.far += dt; if (e.far > 6) { const s = ringSpot(14, 20); e.pos.set(s.x, s.y, s.z); e.far = 0; } } else e.far = 0;
       e.m.position.copy(e.pos);
       if (e.boss) animate(e.m, t, moving); else animateEnemy(e.m, t, moving);
@@ -641,6 +643,8 @@ export function createAdventure(G) {
         spawnEnemy(next.type, { big: next.big, boss: next.boss, n: wave.n });
         wave.spawnT = 0.8 + rnd() * 0.8;
       }
+      // safety: a wave creature that can no longer be fought (broken health or position) is cleared
+      for (const e of enemies.filter(e => e.wave && !(e.hp > 0 && isFinite(e.pos.x + e.pos.y + e.pos.z)))) { (window.__odd || (window.__odd = [])).push({ type: e.type, hp: e.hp, max: e.max, pos: [e.pos.x, e.pos.y, e.pos.z] }); removeEnemy(e); }
       if (!wave.todo.length && !enemies.some(e => e.wave)) waveWon();
     }
     if (visitors && !enemies.some(e => !e.wave && !e.camp)) { visitors = false; G.toast('The night visitors are gone. +coins'); }

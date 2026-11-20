@@ -1524,9 +1524,13 @@ function covered() {
   return false;
 }
 
-function frame() {
-  const dt = Math.min(0.05, clock.getDelta());
-  if (race.active) { race.frame(dt); requestAnimationFrame(frame); return; }
+// ?film: the game only moves when told to (a fixed step per frame), so a bot can record a smooth video
+const FILM = params.has('film');
+const nextFrame = () => { if (!FILM) requestAnimationFrame(frame); };
+function frame(filmDt, noDraw) {
+  const dt = FILM ? (filmDt || 1 / 24) : Math.min(0.05, clock.getDelta());
+  if (FILM) clock.elapsedTime += dt;
+  if (race.active) { race.frame(dt); nextFrame(); return; }
   if (playing && friends) friends.update(dt, clock.elapsedTime);
   if (pets) pets.update(playing && !panelOpen() ? dt : 0);
   updateChunks(playing ? 6 : 14);
@@ -1661,7 +1665,7 @@ function frame() {
     const below = groundAbove();
     $('depth').classList.toggle('hide', below < 2);
     $('depth').textContent = `${below} blocks down`;
-    $('upBtn').classList.toggle('hide', below < 3 || !!adv.wave || panelOpen() || player.fly);
+    $('upBtn').classList.toggle('hide', below < 3 || panelOpen() || player.fly);
     if (below >= 3 && !upTold) { upTold = true; toast(TOUCH ? 'Deep down! Hold Jump next to a wall to climb, or tap "Back to the top".' : 'Deep down! Hold Space next to a wall to climb, or press U to go back to the top.'); }
     const hint = $('hint');
     if (!hint.classList.contains('big') || panelOpen()) hint.textContent = nearShip() && launchT < 0 && !panelOpen() ? says('Press F to open the ship') : '';
@@ -1672,8 +1676,8 @@ function frame() {
   }
   if (showFps) { fpsT += dt; fpsN++; if (fpsT > 0.5) { $('fps').textContent = `${Math.round(fpsN / fpsT)} fps`; fpsT = 0; fpsN = 0; } }
 
-  if (useGlow()) { setupGlow(); composer.render(); } else renderer.render(scene, camera);
-  requestAnimationFrame(frame);
+  if (!noDraw) { if (useGlow()) { setupGlow(); composer.render(); } else renderer.render(scene, camera); }
+  nextFrame();
 }
 
 
@@ -2019,7 +2023,7 @@ function renderMission() {
 $('findBtn').onclick = () => findShip();
 if (TOUCH) $('findBtn').textContent = 'Find ship';
 function backToTop() {
-  if (!playing || adv.wave || groundAbove() < 2) { toast('You are already at the top.'); return; }
+  if (!playing || groundAbove() < 2) { toast('You are already at the top.'); return; }
   // stand on the highest ground close by (your own hole is lower, so this lands you beside it)
   const x0 = Math.floor(player.pos.x), z0 = Math.floor(player.pos.z);
   let best = null;
@@ -2180,7 +2184,7 @@ $('newBtn').onclick = () => {
   if ($('newBtn').dataset.armed) { landOn(picked, true); start(); return; }
   $('newBtn').dataset.armed = '1'; $('newBtn').textContent = 'Click again to wipe your world';
 };
-requestAnimationFrame(frame);
+if (FILM) frame(); else requestAnimationFrame(frame);
 
 // hooks for automated testing and screenshots
 window.__game = {
@@ -2189,5 +2193,5 @@ window.__game = {
   start: () => { playing = true; $('hud').classList.remove('hide'); $('touch').classList.add('on'); for (const p of panels) $(p).classList.add('hide'); renderHotbar(); renderGoal(); },
   pending: () => updateChunks(50), landOn, get look() { return look; },
   hit: () => hit, mouse, keys, tch, TOUCH, dig, useAction, renderGoal, get launchT() { return launchT; },
-  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; },
+  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, frame, stepNow, findNear, canMake, RECIPES, ITEMS, PARTS, nearShip, SHIP_CENTER, SHIP_BASE, get playing() { return playing; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; },
 };
