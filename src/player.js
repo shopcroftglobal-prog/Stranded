@@ -33,7 +33,7 @@ export class Player {
     return false;
   }
   touchingWall() {
-    const p = this.pos, d = 0.25;
+    const p = this.pos, d = 0.35;
     return this.collides(p.x + d, p.y + 0.1, p.z) || this.collides(p.x - d, p.y + 0.1, p.z) || this.collides(p.x, p.y + 0.1, p.z + d) || this.collides(p.x, p.y + 0.1, p.z - d);
   }
   // input: {f, r, jump, run} ; returns events {stepped, landed, jumped}
@@ -63,7 +63,7 @@ export class Player {
     } else {
       if (input.jump && this.onGround) { v.y = this.phys.jump; this.onGround = false; ev.jumped = true; }
       // climbing: hold Jump against a wall to climb up it (so a deep hole is never a trap)
-      else if (input.jump && !this.rover && this.touchingWall()) { v.y = Math.max(v.y, 4.5); ev.climbing = true; }
+      else if (input.jump && !this.rover && this.touchingWall()) { v.y = Math.max(v.y, 5.5); ev.climbing = true; }
       v.y = Math.max(v.y - this.phys.gravity * dt, -30);
     }
     const wasGround = this.onGround; let climbed = false;

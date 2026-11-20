@@ -1236,6 +1236,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyV') toggleRover();
   if (e.code === 'KeyY') toggleView();
   if (e.code === 'KeyU') backToTop();
+  if (e.code === 'KeyN') findShip();
   if (e.code === 'KeyR') openPrizes();
   if (e.code === 'KeyH' && launchT < 0) { bookWorld = '_shop'; openPanel('bookPanel'); }
   if (/^Digit[1-9]$/.test(e.code)) { state.sel = +e.code[5] - 1; renderHotbar(); }
@@ -1349,7 +1350,7 @@ function setupTouch() {
   hold('tPlace', () => useAction(), () => { });
   const tap = (id, fn) => $(id).addEventListener('click', (e) => { e.preventDefault(); initAudio(); fn(); });
   tap('tBag', () => { if (launchT < 0) openPanel('bag'); });
-  tap('tShip', () => { if (launchT >= 0) return; if (nearShip()) openPanel('shipPanel'); else toast('Walk up to the ship first'); });
+  tap('tShip', () => { if (launchT >= 0) return; if (nearShip()) openPanel('shipPanel'); else findShip(); });
   tap('tPause', () => openPanel('pause'));
   tap('tBook', () => { if (launchT < 0) openPanel('bookPanel'); });
   tap('tChat', () => { if (inCamp) openPanel('chatPanel'); });
@@ -1646,7 +1647,9 @@ function frame() {
 
   // hud
   if (playing) {
-    const guided = updateWay(dt);
+    let guided = updateWay(dt);
+    if (updateFinder(dt)) guided = true;
+    missionT -= dt; if (missionT <= 0) { missionT = 0.4; renderMission(); }
     const d = SHIP_CENTER.clone().sub(camera.position); d.y = 0;
     const dist = d.length();
     if (!guided) { $('compass').classList.toggle('hide', dist < 7); $('compass').querySelector('span').textContent = 'Ship'; }
@@ -1655,14 +1658,14 @@ function frame() {
       $('compass').querySelector('.arrow').style.transform = `rotate(${-rel}rad)`;
       $('shipDist').textContent = `${Math.round(dist)} m`;
     }
-    const below = SHIP_BASE - 1 - Math.floor(player.pos.y);
+    const below = groundAbove();
     $('depth').classList.toggle('hide', below < 2);
     $('depth').textContent = `${below} blocks down`;
-    $('upBtn').classList.toggle('hide', below < 6 || !!adv.wave || panelOpen());
-    if (below >= 6 && !upTold) { upTold = true; toast(TOUCH ? 'Deep down! Hold Jump next to a wall to climb, or tap "Back to the top".' : 'Deep down! Hold Space next to a wall to climb, or press U to go back to the top.'); }
+    $('upBtn').classList.toggle('hide', below < 3 || !!adv.wave || panelOpen() || player.fly);
+    if (below >= 3 && !upTold) { upTold = true; toast(TOUCH ? 'Deep down! Hold Jump next to a wall to climb, or tap "Back to the top".' : 'Deep down! Hold Space next to a wall to climb, or press U to go back to the top.'); }
     const hint = $('hint');
     if (!hint.classList.contains('big') || panelOpen()) hint.textContent = nearShip() && launchT < 0 && !panelOpen() ? says('Press F to open the ship') : '';
-    if (TOUCH) $('tShip').classList.toggle('far', !nearShip());
+    if (TOUCH) { const nr = nearShip(); $('tShip').classList.toggle('far', !nr && findT <= 0); $('tShip').classList.toggle('finding', findT > 0); $('tShip').textContent = nr ? 'Ship' : 'Find ship'; }
     goalTimer -= dt; if (goalTimer <= 0) { goalTimer = 0.5; renderGoal(); }
     renderStatus();
     saveTimer -= dt; if (saveTimer <= 0) { saveTimer = 10; writeSave(); }
@@ -1936,8 +1939,87 @@ quests = createQuests({ toast: (t) => toast(t), banner: (a, b) => banner(a, b), 
 
 // ---- getting out of deep holes
 let upTold = false;
+// how far the ground around you (5 x 5 blocks) is above your feet
+function groundAbove() {
+  const x0 = Math.floor(player.pos.x), z0 = Math.floor(player.pos.z);
+  let top = -1;
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) top = Math.max(top, world.surfaceY(x0 + dx, z0 + dz));
+  return top + 1 - Math.floor(player.pos.y + 0.01);
+}
+// ---- Find ship: a tall light over the ship, glowing arrows on the ground, and the top arrow pointing home
+let findT = 0, missionT = 0;
+const shipBeam = (() => {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: 0x7dff9a, transparent: true, opacity: 0.45, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 160, 12, 1, true), mat);
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 160, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0x7dff9a, transparent: true, opacity: 0.14, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+  core.position.y = glow.position.y = 80; g.add(core, glow); g.userData.mat = mat;
+  g.visible = false; scene.add(g); return g;
+})();
+const trail = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  x.fillStyle = '#7dff9a'; x.strokeStyle = '#0b3a1a'; x.lineWidth = 4;
+  x.beginPath(); x.moveTo(32, 6); x.lineTo(56, 40); x.lineTo(42, 40); x.lineTo(42, 58); x.lineTo(22, 58); x.lineTo(22, 40); x.lineTo(8, 40); x.closePath(); x.fill(); x.stroke();
+  const mat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide });
+  const out = [];
+  for (let i = 0; i < 7; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), mat); m.rotation.order = 'YXZ'; m.visible = false; scene.add(m); out.push(m); }
+  return out;
+})();
+function findShip() {
+  if (!playing || inCamp || race.active) return;
+  findT = findT > 0 ? 0 : 60;
+  if (findT) { sfx.scan(); toast(says('Follow the green arrows and the green light to your ship.') + (TOUCH ? ' Tap Find ship again to stop.' : ' Press N again to stop.')); }
+  else toast('Ship finder off.');
+}
+function updateFinder(dt) {
+  if (!playing || inCamp) { shipBeam.visible = false; trail.forEach(t => t.visible = false); return false; }
+  findT = Math.max(0, findT - dt);
+  const d = new THREE.Vector3(SHIP_CENTER.x - player.pos.x, 0, SHIP_CENTER.z - player.pos.z), dist = d.length();
+  if (findT > 0 && dist < 6) { findT = 0; toast('You found your ship!'); sfx.cleared && sfx.cleared(); }
+  // the light over the ship is on while finding it, and on its own at night when you are far away
+  shipBeam.visible = findT > 0 || (adv.isDark() && dist > 20);
+  shipBeam.position.set(SHIP_CENTER.x, SHIP_BASE, SHIP_CENTER.z);
+  shipBeam.userData.mat.opacity = (findT > 0 ? 0.55 : 0.3) + Math.sin(clock.elapsedTime * 4) * 0.12;
+  $('findBtn').classList.toggle('on', findT > 0);
+  if (findT <= 0) { trail.forEach(t => t.visible = false); return false; }
+  // glowing arrows on the ground leading home
+  d.normalize();
+  const yaw = Math.atan2(d.x, d.z), shift = (clock.elapsedTime * 2.5) % 2.5;
+  trail.forEach((t, i) => {
+    const s = 2 + i * 2.5 + shift;
+    if (s > dist - 2) { t.visible = false; return; }
+    const x = player.pos.x + d.x * s, z = player.pos.z + d.z * s;
+    let y = world.surfaceY(Math.floor(x), Math.floor(z)) + 1.06;
+    if (y > player.pos.y + 6 || y < player.pos.y - 8) y = Math.floor(player.pos.y) + 0.06;
+    t.position.set(x, y, z); t.rotation.set(-Math.PI / 2, 0, 0); t.rotation.y = yaw + Math.PI; t.rotation.x = -Math.PI / 2;
+    t.material.opacity = 1; t.visible = true;
+  });
+  // the top arrow points to the ship
+  const box = $('compass'); box.classList.remove('hide');
+  box.querySelector('span').textContent = 'Ship';
+  let rel = Math.atan2(-d.x, -d.z) - player.yaw; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+  box.querySelector('.arrow').style.transform = `rotate(${-rel}rad)`;
+  $('shipDist').textContent = `${Math.round(dist)} m`;
+  return true;
+}
+// one short line at the top that always says what to do now
+function renderMission() {
+  const el = $('mission');
+  if (!playing || inCamp || race.active || !state) { el.classList.add('hide'); return; }
+  let txt, head;
+  if (findT > 0) { head = 'Going home'; txt = 'Follow the green arrows to your ship.'; }
+  else if (!state.won) {
+    const n = PARTS.filter(p => state.fixed[p.id]).length;
+    head = `Mission ${Math.min(4, n + 1)} of 4: fix your ship`;
+    txt = stepNow().text.split(/(?<=[.!?])\s/)[0];
+  } else { head = `Mission: wave ${wavesOn(look.planet.id) + 1} of ${LAST_WAVE}`; txt = nextTip().split(/(?<=[.!?])\s/)[0]; }
+  el.classList.remove('hide');
+  el.innerHTML = `<b>${head}</b><span>${says(txt)}</span>`;
+}
+$('findBtn').onclick = () => findShip();
+if (TOUCH) $('findBtn').textContent = 'Find ship';
 function backToTop() {
-  if (!playing || adv.wave) return;
+  if (!playing || adv.wave || groundAbove() < 2) { toast('You are already at the top.'); return; }
   // stand on the highest ground close by (your own hole is lower, so this lands you beside it)
   const x0 = Math.floor(player.pos.x), z0 = Math.floor(player.pos.z);
   let best = null;

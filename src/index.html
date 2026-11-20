@@ -51,8 +51,18 @@ button:disabled { opacity: 0.45; cursor: default; }
 @keyframes pulse { from { opacity: 0.6; } to { opacity: 1; } }
 #underwater { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, rgba(20,110,130,0.25), rgba(4,40,60,0.6)); opacity: 0; transition: opacity 0.3s; } #underwater.on { opacity: 1; }
 #compass .arrow { display: inline-block; width: 18px; text-align: center; color: #ffd7b0; }
-#upBtn { position: absolute; top: 80px; right: 12px; padding: 8px 12px; font-size: 14px; background: #2e6a4a; border: 2px solid #7dff9a; color: #fff; z-index: 6; pointer-events: auto; }
-.touch #upBtn { top: calc(86px + env(safe-area-inset-top, 0px)); padding: 10px 14px; }
+#upBtn { position: absolute; top: 132px; right: 12px; padding: 10px 14px; font-size: 16px; font-weight: bold; animation: pulse2 1.2s infinite alternate; background: #2e6a4a; border: 2px solid #7dff9a; color: #fff; z-index: 6; pointer-events: auto; }
+.touch #upBtn { top: auto; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); right: calc(170px + env(safe-area-inset-right, 0px)); padding: 12px 16px; font-size: 16px; }
+@keyframes pulse2 { from { box-shadow: 0 0 4px #7dff9a; } to { box-shadow: 0 0 18px #7dff9a; } }
+#findBtn { position: absolute; top: 86px; right: 12px; padding: 7px 12px; font-size: 14px; background: #1f4a33; border: 2px solid #7dff9a; color: #e8ffe9; z-index: 6; pointer-events: auto; }
+#findBtn.on { background: #2e7a4a; box-shadow: 0 0 14px #7dff9a; }
+.touch #findBtn { display: none; }
+#tShip.finding { background: #2e7a4a; border-color: #7dff9a; opacity: 1; }
+#mission { position: absolute; bottom: 104px; left: 50%; transform: translateX(-50%); max-width: min(620px, calc(100vw - 40px)); min-width: 260px; padding: 6px 14px; text-align: center; border: 2px solid #ffd040; box-shadow: 0 0 12px rgba(255,208,64,.35); display: flex; flex-direction: column; gap: 2px; z-index: 5; }
+#mission b { color: #ffd040; font-size: 13px; letter-spacing: .5px; text-transform: uppercase; }
+#mission span { color: #fff3d6; font-size: 15px; }
+.touch #mission { bottom: auto; top: calc(50px + env(safe-area-inset-top, 0px)); left: calc(50% + 60px); max-width: min(360px, 44vw); min-width: 0; padding: 4px 10px; }
+.touch #mission b { font-size: 11px; } .touch #mission span { font-size: 13px; }
 #depth { position: absolute; top: 46px; right: 12px; padding: 4px 10px; font-size: 14px; color: var(--muted); }
 #toasts { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .toast { background: rgba(20,10,8,0.85); border: 1px solid #6e2d18; padding: 4px 12px; font-size: 15px; animation: fade 2.6s forwards; }
@@ -343,6 +353,8 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <div id="world" class="panel"><span id="worldName"></span><span id="worldTemp"></span></div>
   <div id="depth" class="panel"></div>
   <button id="upBtn" class="hide">⬆ Back to the top (U)</button>
+  <button id="findBtn">Find ship (N)</button>
+  <div id="mission" class="panel hide"></div>
   <div id="toasts"></div>
   <div id="hint"></div>
   <div id="chatLog" class="hide"></div>
