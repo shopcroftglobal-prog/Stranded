@@ -251,3 +251,79 @@ export function createDustDevils(scene) {
     },
   };
 }
+
+// ---- thin high clouds that drift slowly (Mars has wispy blue-white ice clouds; thicker clouds where the air is thick)
+export function createClouds(scene) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+  const x = cv.getContext('2d'), img = x.createImageData(256, 256);
+  // soft wisps: a few layers of smooth random blobs, stretched along the wind
+  const g = [];
+  for (let k = 0; k < 5; k++) { const N = 4 << k, arr = []; for (let i = 0; i < N * N; i++) arr.push(Math.random()); g.push({ N, arr }); }
+  const smp = (o, u, v) => { const N = o.N, X = u * N, Y = v * N, x0 = Math.floor(X), y0 = Math.floor(Y), fx = X - x0, fy = Y - y0; const at = (a, b) => o.arr[((b % N + N) % N) * N + ((a % N + N) % N)]; const s = (t) => t * t * (3 - 2 * t); const a = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * s(fx), b = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * s(fx); return a + (b - a) * s(fy); };
+  for (let j = 0; j < 256; j++) for (let i = 0; i < 256; i++) {
+    let v = 0, amp = 0.5;
+    for (const o of g) { v += smp(o, i / 256, j / 256) * amp; amp *= 0.55; }
+    v = Math.max(0, Math.min(1, (v - 0.52) * 3.2));
+    const p = (j * 256 + i) * 4; img.data[p] = img.data[p + 1] = img.data[p + 2] = 255; img.data[p + 3] = v * 255;
+  }
+  x.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uTex: { value: tex }, uOff: { value: new THREE.Vector2() }, uCol: { value: new THREE.Color(0xeaf2ff) }, uK: { value: 0 } },
+    vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: `uniform sampler2D uTex; uniform vec2 uOff; uniform vec3 uCol; uniform float uK; varying vec2 vP;
+      void main(){
+        vec2 uv = vP / vec2(700.0, 520.0) + uOff;
+        float a = texture2D(uTex, uv).a;
+        float edge = 1.0 - smoothstep(250.0, 800.0, length(vP));
+        gl_FragColor = vec4(uCol, a * edge * uK);
+      }`,
+    transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide,
+  });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), mat);
+  m.rotation.x = -Math.PI / 2; m.renderOrder = -3.8; m.frustumCulled = false; m.visible = false; scene.add(m);
+  return {
+    update(dt, camPos, k, col) {
+      m.visible = k > 0.01; if (!m.visible) return;
+      m.position.set(camPos.x, Math.min(camPos.y, 50) + 170, camPos.z);
+      mat.uniforms.uOff.value.x += dt * 0.0016; mat.uniforms.uOff.value.y += dt * 0.0004;
+      mat.uniforms.uOff.value.x = (mat.uniforms.uOff.value.x + camPos.x / 900 * 0) % 1;
+      mat.uniforms.uK.value = k; if (col != null) mat.uniforms.uCol.value.set(col);
+    },
+  };
+}
+
+// ---- Europa: tall plumes of water shooting out of cracks in the ice, then falling back as snow
+export function createPlumes(scene) {
+  const spots = [[70, -40], [-62, -72], [20, 96], [-110, 30]];
+  const tex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const x = cv.getContext('2d'); const gr = x.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(cv); })();
+  const list = spots.map(([x, z], k) => {
+    const n = 420, pos = new Float32Array(n * 3), seeds = [];
+    for (let i = 0; i < n; i++) seeds.push([Math.random(), Math.random() * Math.PI * 2, Math.random()]);
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({ map: tex, color: 0xe8f4ff, size: 2.6, transparent: true, opacity: 0.5, depthWrite: false });
+    const p = new THREE.Points(geo, mat); p.frustumCulled = false; p.visible = false; scene.add(p);
+    return { x, z, y: null, p, mat, geo, seeds, n, t: k * 7 };
+  });
+  return {
+    spots,
+    update(dt, groundY, on) {
+      for (const s of list) {
+        s.p.visible = on; if (!on) continue;
+        if (s.y == null) s.y = groundY(s.x, s.z) + 1;
+        s.t += dt;
+        const pulse = 0.55 + 0.45 * Math.sin(s.t * 0.35);
+        s.mat.opacity = 0.55 * pulse;
+        const a = s.geo.attributes.position.array, H = 70 * pulse;
+        for (let i = 0; i < s.n; i++) {
+          const [u, ph, w] = s.seeds[i];
+          const f = (u + s.t * 0.18) % 1;            // 0 at the crack, 1 at the top
+          const r = 0.4 + f * f * 9 * (0.4 + w);
+          a[i * 3] = s.x + Math.cos(ph) * r; a[i * 3 + 1] = s.y + Math.sin(f * Math.PI * 0.5) * H; a[i * 3 + 2] = s.z + Math.sin(ph) * r;
+        }
+        s.geo.attributes.position.needsUpdate = true;
+      }
+    },
+    reset() { for (const s of list) s.y = null; },
+  };
+}

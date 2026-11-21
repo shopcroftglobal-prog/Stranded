@@ -172,7 +172,7 @@ const BOT = () => {
   await p.goto('file://' + path.resolve(__dirname, '../dist/play.html') + '?desktop&shot&film&god', { timeout: 90000 });
   await p.evaluate(() => { localStorage.clear(); localStorage.setItem('stranded-settings-v1', JSON.stringify({ quality: 'low', sound: 0, music: 0 })); }); await p.reload({ timeout: 90000 });
   await p.evaluate(() => document.getElementById('playBtn').click());
-  await p.evaluate(() => { const g = __game; g.profile.guide = 99; for (let i = 0; i < 200; i++) g.frame(1 / 24, true); });
+  await p.evaluate(() => { const g = __game; g.profile.guide = 99; if (g.behind && !window.__shoulder) g.toggleView(); for (let i = 0; i < 200; i++) g.frame(1 / 24, true); });
   await p.evaluate(BOT);
   const cdp = await p.context().newCDPSession(p);
   let n = 0;

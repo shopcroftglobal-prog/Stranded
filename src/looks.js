@@ -94,7 +94,17 @@ export function worldParams(id) {
   };
   if (r.air === 'none') { t.craterChance = 0.85; t.cell = 40; t.craterVar = 12; }   // no air: nothing wears craters away
   if (r.air === 'thick') { t.craterChance = 0.25; t.craterDepth = 0.4; }
-  if (id === 'mars') t.mars = true;   // volcanoes, canyons, layered hills, dark dunes, frost (see world.js)
+  // real landscapes (see landShape in world.js)
+  if (id === 'mars') t.land = {
+    volcano: { big: { x: 105, z: -85, r: 82, hgt: 24 }, cell: 420, chance: 0.55, rMin: 60, rVar: 40, hMin: 18, hVar: 8 },
+    canyon: { f: 0.0032, w: 0.2, floor: 9, depth: 99, strata: true }, mesa: { f: 0.0045, near: [-70, 58] }, dunes: { near: [52, 62] },
+    frostAbove: 48, strata: 'mars', cap: { z: -300 }, tracks: true, green: true,
+  };
+  if (id === 'moon') t.land = { mare: true, rays: true, canyon: { f: 0.004, w: 0.05, floor: 10, depth: 7 } };
+  if (id === 'europa') t.land = { chaos: true };
+  if (id === 'proxima') t.land = { volcano: { cell: 150, chance: 0.6, rMin: 16, rVar: 14, hMin: 9, hVar: 9 } };
+  if (id === 'trappist1e') t.land = { beach: true, mesa: { f: 0.006, coast: true, scale: 0.8 }, strata: 'grey' };
+  if (id === 'lhs1140b') t.land = { canyon: { f: 0.005, w: 0.06, floor: 8, depth: 12, strata: true }, mesa: { f: 0.005, scale: 0.9 }, strata: 'ice', frostAbove: 40 };
   if (id === 'moon') { t.glassRims = true; t.floorIce = 0.6; }
   if (id === 'europa') { t.craterChance = 0.18; t.cracks = true; t.iceShell = 7; t.amp *= 0.35; t.ridge *= 0.4; t.rocks = 0.5; }
   if (id === 'proxima') { t.freq = 0.016; t.amp *= 1.35; t.ridge *= 1.4; t.sea = 28; t.liquid = true; t.lava = true; }

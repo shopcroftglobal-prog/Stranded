@@ -10,6 +10,12 @@ export const SPAWN_H = 30;
 const WRECK_CELL = 52;     // one buried wreck in about half of these squares     // flat ground height around the crash site
 const key = (cx, cz) => cx + ',' + cz;
 const idx = (x, y, z) => x + z * CS + y * CS * CS;
+// stripes in hills and canyon walls, from the top down
+const STRATA = {
+  mars: [B.TANROCK, B.PALECLAY, B.TANROCK, B.PURPLEROCK, B.DUST, B.PALECLAY, B.REDDIRT],
+  grey: [B.STONE, B.ROCK, B.STONE, B.DUST, B.ROCK, B.REDDIRT],
+  ice: [B.ICE, B.FROST, B.ICE, B.ICE, B.DUST, B.ICE, B.FROST],
+};
 const smooth = (e0, e1, x) => { const t = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1); return t * t * (3 - 2 * t); };
 
 // params come from looks.js worldParams(): terrain shape and ores for one world
@@ -90,7 +96,7 @@ export class World {
       h += crack > 0.15 && crack < 0.75 ? 1 : 0;
     }
     const d0 = Math.hypot(x, z);
-    const mars = T.mars ? this.marsShape(x, z, h, d0) : null;
+    const mars = T.land ? this.landShape(x, z, h, d0) : null;
     if (mars) h = mars.h;
     const flat = smooth(17, 10, d0);
     h = h * (1 - flat) + SPAWN_H * flat;
@@ -98,61 +104,117 @@ export class World {
     return { h: Math.max(4, Math.min(H - 6, Math.floor(h))), floor, crystal, d0, rim, crack, mars };
   }
 
-  // Real Mars landscapes, each one based on a real place:
-  //  - a giant shield volcano with a crater on top and a cliff round its foot (Olympus Mons)
-  //  - a long deep canyon with striped walls (Valles Marineris)
-  //  - stepped, striped hills of tan, cream and purple rock (Mount Sharp in Gale crater)
-  //  - fields of dark grey sand dunes (the Bagnold dunes)
-  //  - white frost on the cold high ground
-  marsShape(x, z, h, d0) {
-    const n = this.noise;
+  // Real landscapes, each one based on a real place. Which ones a world has is set in looks.js (terrain.land).
+  //  Mars: a giant shield volcano (Olympus Mons), a long striped canyon (Valles Marineris), stepped striped hills
+  //        (Mount Sharp), dark dunes (the Bagnold dunes), frost on high ground, the north ice cap with dusty layers.
+  //  Moon: dark flat "seas" of old lava (the maria), bright rays thrown out by young craters (Tycho), a winding rille.
+  //  Europa: "chaos" ground, where the ice broke into rafts and froze again (Conamara Chaos).
+  //  Proxima b: small ash volcanoes. TRAPPIST-1e: sandy beaches and grey sea cliffs. LHS 1140 b: ice cliffs, blue crevasses.
+  landShape(x, z, h, d0) {
+    const n = this.noise, L = this.T.land;
     const far = smooth(40, 80, d0);          // keep the ground round the ship as it was
-    let volc = 0, caldera = false, layer = 0, dune = 0, canyon = 0;
-    // volcanoes: one big one you can walk to from the ship, more far away
-    for (const v of this.volcanoes(x, z)) {
+    let volc = 0, caldera = false, layer = 0, dune = 0, canyon = 0, mare = 0, ray = 0, chaos = 0, chaosEdge = false, cap = 0, trough = false, beach = false;
+    // volcanoes
+    if (L.volcano) for (const v of this.volcanoes(x, z)) {
       const d = Math.hypot(x - v.x, z - v.z) * (1 + 0.08 * n.n2(x * 0.03, z * 0.03));
       if (d > v.r) continue;
       const t = d / v.r;
       let rise = v.hgt * Math.pow(1 - t, 1.25) + (t < 0.9 ? 4 * smooth(0.9, 0.84, t) : 0);
       if (t < 0.16) { rise = v.hgt * Math.pow(1 - 0.16, 1.25) + 4 - 7 * smooth(0.16, 0.12, t); caldera = true; }
-      const k = smooth(1, 0.9, t);
+      const k = smooth(1, 0.9, t) * (v.big ? 1 : far);
       if (rise * k > volc) volc = rise * k;
     }
     if (volc > 0) h = Math.max(h, 30 + volc);
-    // the canyon: a long winding crack, flat floor, steep walls
-    if (!volc) {
-      const c = Math.abs(n.n2(x * 0.0032 + 11.3, z * 0.0032 - 7.7) + 0.05 * n.n2(x * 0.03, z * 0.03));
-      canyon = smooth(0.2, 0.1, c) * smooth(60, 110, d0);
-      if (canyon > 0) h = h - canyon * Math.max(0, h - 9);
-      if (c < 0.26 && d0 > 60) layer = 1;
+    // the canyon (or rille, or crevasse): a long winding crack with steep walls
+    if (L.canyon && !volc) {
+      const C = L.canyon;
+      const c = Math.abs(n.n2(x * C.f + 11.3, z * C.f - 7.7) + 0.05 * n.n2(x * 0.03, z * 0.03));
+      canyon = smooth(C.w, C.w * 0.5, c) * smooth(60, 110, d0);
+      if (canyon > 0) h = h - canyon * Math.max(0, h - Math.max(C.floor, h - C.depth));
+      if (C.strata && c < C.w * 1.3 && d0 > 60) layer = 1;
     }
-    // layered hills: stepped like stairs
-    let m = n.n2(x * 0.0045 + 40.5, z * 0.0045 - 90.2);
-    const hill = Math.hypot(x + 70, z - 58); m = Math.max(m, 0.55 * smooth(46, 20, hill));   // one close to the ship
-    const mk = smooth(0.18, 0.4, m) * far * (1 - canyon) * (volc ? 0 : 1);
-    if (mk > 0) {
-      const raw = mk * (10 + 16 * smooth(0.3, 0.7, m + 0.12 * n.n2(x * 0.02, z * 0.02)));
-      const step = Math.floor(raw / 3) * 3 + smooth(0.75, 1, (raw / 3) % 1) * 3;
-      h += step; layer = Math.max(layer, smooth(0, 0.3, mk));
+    // stepped hills with stripes
+    let mk = 0;
+    if (L.mesa) {
+      const M = L.mesa;
+      let m = n.n2(x * M.f + 40.5, z * M.f - 90.2);
+      if (M.near) { const hill = Math.hypot(x - M.near[0], z - M.near[1]); m = Math.max(m, 0.55 * smooth(46, 20, hill)); }
+      mk = smooth(0.18, 0.4, m) * far * (1 - canyon) * (volc ? 0 : 1);
+      if (M.coast) mk *= smooth(this.T.sea - 1, this.T.sea + 2, h);
+      if (mk > 0) {
+        const raw = mk * (10 + 16 * smooth(0.3, 0.7, m + 0.12 * n.n2(x * 0.02, z * 0.02))) * (M.scale || 1);
+        const step = Math.floor(raw / 3) * 3 + smooth(0.75, 1, (raw / 3) % 1) * 3;
+        h += step; layer = Math.max(layer, smooth(0, 0.3, mk));
+      }
     }
     // dark dune fields on low flat ground
-    let dn = n.n2(x * 0.006 - 200.1, z * 0.006 + 130.4);
-    const field = Math.hypot(x - 52, z - 62); dn = Math.max(dn, 0.5 * smooth(40, 18, field));
-    dune = smooth(0.26, 0.4, dn) * smooth(14, 22, d0) * (1 - mk) * (volc ? 0 : 1) * (1 - canyon);
-    if (dune > 0) { const r = 1 - Math.abs(n.n2(x * 0.06 + 3.1, z * 0.022 - 1.7)); h += dune * r * r * r * 5; }
-    return { h, volc, caldera, layer, dune, canyon };
+    if (L.dunes) {
+      let dn = n.n2(x * 0.006 - 200.1, z * 0.006 + 130.4);
+      if (L.dunes.near) { const field = Math.hypot(x - L.dunes.near[0], z - L.dunes.near[1]); dn = Math.max(dn, 0.5 * smooth(40, 18, field)); }
+      dune = smooth(0.26, 0.4, dn) * smooth(14, 22, d0) * (1 - mk) * (volc ? 0 : 1) * (1 - canyon);
+      if (dune > 0) { const r = 1 - Math.abs(n.n2(x * 0.06 + 3.1, z * 0.022 - 1.7)); h += dune * r * r * r * 5; }
+    }
+    // Moon: dark lava seas, low and smooth
+    if (L.mare) {
+      let m = n.n2(x * 0.004 + 77.7, z * 0.004 - 12.3);
+      m = Math.max(m, 0.5 * smooth(60, 30, Math.hypot(x + 60, z + 70)));
+      mare = smooth(0.15, 0.3, m) * smooth(16, 26, d0);
+      if (mare > 0) h = h * (1 - mare * 0.75) + (28 + (h - 31) * 0.15) * mare * 0.75;
+    }
+    // Moon: bright rays around young craters
+    if (L.rays) {
+      const cell = this.T.cell, gx = Math.floor(x / cell), gz = Math.floor(z / cell);
+      for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) {
+        const c = this.crater(gx + a, gz + b);
+        if (!c || hash3(gx + a, 60, gz + b, 61) < 0.55) continue;
+        const dx = x - c.x, dz = z - c.z, d = Math.hypot(dx, dz);
+        if (d < c.r * 1.1 || d > c.r * 6) continue;
+        const ang = Math.atan2(dz, dx), seed = hash3(gx + a, 62, gz + b, 63) * 50;
+        const s = Math.sin(ang * 7 + seed) * 0.6 + Math.sin(ang * 13 + seed * 2) * 0.4;
+        if (s > 0.62 + (d / (c.r * 6)) * 0.3) ray = Math.max(ray, 1 - d / (c.r * 6));
+      }
+    }
+    // Europa: chaos, ice broken into rafts that froze again at odd heights
+    if (L.chaos) {
+      let m = n.n2(x * 0.005 - 33.3, z * 0.005 + 44.4);
+      m = Math.max(m, 0.5 * smooth(40, 20, Math.hypot(x - 60, z + 50)));
+      chaos = smooth(0.2, 0.35, m) * smooth(20, 32, d0);
+      if (chaos > 0) {
+        const S = 6, px = Math.floor((x + 1000) / S), pz = Math.floor((z + 1000) / S);
+        chaosEdge = ((x + 1000) % S === 0 || (z + 1000) % S === 0) && hash3(px, 70, pz, 71) > 0.25;
+        h += chaos * ((hash3(px, 72, pz, 73) - 0.35) * 8 + ((x + 1000) % S) * (hash3(px, 74, pz, 75) - 0.5) * 0.8) - (chaosEdge ? 2 * chaos : 0);
+      }
+    }
+    // Mars: the north ice cap, a high plateau of ice with dusty layers and deep curving valleys
+    if (L.cap) {
+      cap = smooth(L.cap.z, L.cap.z - 60, z);
+      if (cap > 0) {
+        let top = 40 + 5 * n.fbm2(x * 0.01, z * 0.01, 3);
+        const ang = Math.atan2(z - (L.cap.z - 500), x), r = Math.hypot(x, z - (L.cap.z - 500));
+        const sp = Math.abs(Math.sin(ang * 2 + r * 0.035 + n.n2(x * 0.01, z * 0.01) * 0.6));
+        if (sp < 0.16) { top -= 12 * smooth(0.16, 0.05, sp); trough = true; }
+        h = h * (1 - cap) + top * cap;
+        layer = 0; dune = 0;
+      }
+    }
+    // TRAPPIST-1e: sandy beaches at the edge of the sea
+    if (L.beach && this.T.sea && h >= this.T.sea - 3 && h < this.T.sea + 1.5 && d0 > 14) beach = true;
+    return { h, volc, caldera, layer, dune, canyon, mare, ray, chaos, chaosEdge, cap, trough, beach };
   }
 
   volcanoes(x, z) {
-    const out = [{ x: 105, z: -85, r: 82, hgt: 24 }];
-    const C = 420, gx = Math.floor(x / C), gz = Math.floor(z / C);
+    const V = this.T.land.volcano, out = V.big ? [{ ...V.big, big: true }] : [];
+    const C = V.cell, gx = Math.floor(x / C), gz = Math.floor(z / C), pad = Math.min(100, C * 0.3);
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
       const cx = gx + a, cz = gz + b;
-      if ((cx === 0 && cz === 0) || hash3(cx, 40, cz, 41) < 0.45) continue;
-      out.push({ x: cx * C + 100 + hash3(cx, 42, cz, 43) * (C - 200), z: cz * C + 100 + hash3(cx, 44, cz, 45) * (C - 200), r: 60 + hash3(cx, 46, cz, 47) * 40, hgt: 18 + hash3(cx, 48, cz, 49) * 8 });
+      if ((V.big && cx === 0 && cz === 0) || hash3(cx, 40, cz, 41) < 1 - V.chance) continue;
+      out.push({ x: cx * C + pad + hash3(cx, 42, cz, 43) * (C - 2 * pad), z: cz * C + pad + hash3(cx, 44, cz, 45) * (C - 2 * pad), r: V.rMin + hash3(cx, 46, cz, 47) * V.rVar, hgt: V.hMin + hash3(cx, 48, cz, 49) * V.hVar });
     }
     return out;
   }
+
+  // Mars: old rover tracks running east from near the ship to a rover that stopped long ago
+  trackZ(x) { return Math.round(18 + 10 * Math.sin(x / 41) + 5 * Math.sin(x / 17)); }
 
   generate(cx, cz) {
     const data = new Uint8Array(CS * CS * H);
@@ -166,16 +228,24 @@ export class World {
         let id;
         const depth = top - y;
         if (y === 0 || (y === 1 && hash3(x, y, z, 8) > 0.4) || (y === 2 && hash3(x, y, z, 9) > 0.85)) { data[idx(lx, y, lz)] = B.DEEP; continue; }
-        const M = col.mars;
+        const M = col.mars, L = T.land;
         if (M && M.volc > 2 && depth > 0) id = depth <= 1 && hash3(x, y, z, 50) > 0.6 ? B.DUST : (n.n3(x * 0.1, y * 0.1, z * 0.1) > 0.45 ? B.STONE : B.BLACKROCK);
-        else if (M && M.volc > 2) { const pn = n.n2(x * 0.07 + 900, z * 0.07); id = top >= 50 && pn > -0.15 ? B.FROST : pn > 0.1 + M.volc * 0.02 ? B.REDDIRT : B.BLACKROCK; }
+        else if (M && M.volc > 2) { const pn = n.n2(x * 0.07 + 900, z * 0.07); id = L.frostAbove && top >= 50 && pn > -0.15 ? B.FROST : pn > 0.1 + M.volc * 0.02 ? B.REDDIRT : B.BLACKROCK; }
+        else if (M && M.cap > 0.5 && depth <= 22) {
+          // ice with thin dark dusty layers, frost on top
+          const s = Math.floor((y + 0.8 * n.n2(x * 0.03, z * 0.03)) / 1.5);
+          id = depth === 0 && !M.trough ? B.FROST : (((s % 5) + 5) % 5 === 0 ? (hash3(x, y, z, 55) > 0.3 ? B.DUST : B.DARKSAND) : B.ICE);
+        }
         else if (M && M.dune > 0.25 && depth <= 2 + M.dune * 2) id = B.DARKSAND;
         else if (M && M.layer > 0.3 && (depth > 0 || hash3(x, y, z, 52) > 0.45) && y > 8 && depth <= 16) {
+          const st = STRATA[L.strata || 'mars'];
           const s = Math.floor((y + 1.5 * n.n2(x * 0.02, z * 0.02)) / 2);
-          id = [B.TANROCK, B.PALECLAY, B.TANROCK, B.PURPLEROCK, B.DUST, B.PALECLAY, B.REDDIRT][((s % 7) + 7) % 7];
+          id = st[((s % st.length) + st.length) % st.length];
           if (id === B.PALECLAY && depth <= 1 && hash3(x, y, z, 53) > 0.985) id = B.YELLOWSTONE;
         }
-        else if (depth === 0) id = M && top >= 48 ? B.FROST : B.REDDIRT;
+        else if (M && M.beach && depth <= 2) id = B.SAND;
+        else if (M && M.chaos > 0.3 && M.chaosEdge && depth <= 1) id = B.SALT;
+        else if (depth === 0) id = M && L.frostAbove && top >= L.frostAbove ? B.FROST : M && M.ray > 0.05 && hash3(x, y, z, 56) < 0.4 + M.ray ? B.ROCK : M && M.mare > 0.5 ? B.DUST : B.REDDIRT;
         else if (depth <= dustDepth) id = B.DUST;
         else if (T.iceShell && depth <= dustDepth + T.iceShell && n.n3(x * 0.1, y * 0.1, z * 0.1) < 0.55) id = B.ICE;
         else {
@@ -191,7 +261,8 @@ export class World {
         if (O.glass && col.rim > 0.35 && depth <= 1 && n.n2(x * 0.15 + 500, z * 0.15) > 0.25) id = B.GLASS;
         if (O.salt && col.crack > 0.15 && depth <= 2 && hash3(x, y, z, 17) < 0.9) id = B.SALT;
         if (depth === 0 && id === B.REDDIRT && col.d0 > 9 && hash3(x, y, z, 13) > 0.94) id = B.ROCK;
-        if (col.mars && depth === 0 && id === B.REDDIRT && col.rim > 0.4 && n.n2(x * 0.12 + 700, z * 0.12) > 0.35) id = B.GREENSTONE;
+        if (col.mars && T.land.green && depth === 0 && id === B.REDDIRT && col.rim > 0.4 && n.n2(x * 0.12 + 700, z * 0.12) > 0.35) id = B.GREENSTONE;
+        if (T.land && T.land.tracks && depth === 0 && x > 22 && x < 186 && (z === this.trackZ(x) || z === this.trackZ(x) + 3) && !col.mars.volc && (id === B.REDDIRT || id === B.DUST || id === B.DARKSAND || id === B.ROCK)) id = B.TRACKS;
         // tunnels
         if (y > 3 && y < top - 4 && col.d0 > 20) {
           const a = n.n3(x * 0.045, y * 0.07, z * 0.045), b = n.n3(x * 0.045 + 200, y * 0.07, z * 0.045);
@@ -235,6 +306,17 @@ export class World {
           data[idx(x - cx * CS, y, z - cz * CS)] = id;
         }
       }
+    // Mars: the old rover at the end of its tracks, with a supply box on its back
+    if (T.land && T.land.tracks) {
+      const rx = 188, rz = this.trackZ(188) + 1, ry = this.column(rx, rz).h + 1;
+      const put = (x, y, z, id) => { if (Math.floor(x / CS) === cx && Math.floor(z / CS) === cz && y < H) data[idx(x - cx * CS, y, z - cz * CS)] = id; };
+      if (Math.abs(rx - cx * CS - 8) < 14 && Math.abs(rz - cz * CS - 8) < 14) {
+        for (const dx of [-2, 0, 2]) for (const dz of [-2, 2]) put(rx + dx, ry, rz + dz, B.SHIPDARK);       // six wheels
+        for (let dx = -2; dx <= 2; dx++) for (let dz = -1; dz <= 1; dz++) put(rx + dx, ry + 1, rz + dz, dz === 0 && dx === 0 ? B.SUPPLY : B.METAL);
+        put(rx + 2, ry + 2, rz, B.METAL); put(rx + 2, ry + 3, rz, B.METAL); put(rx + 2, ry + 4, rz, B.GLASS_OFF);   // mast and camera head
+        put(rx - 2, ry + 2, rz - 1, B.SHIPDARK);
+      }
+    }
     // the ship
     for (const [k, id] of this.structure) {
       const [x, y, z] = k.split(',').map(Number);

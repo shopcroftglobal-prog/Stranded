@@ -237,6 +237,10 @@ for (const f of FAMILIES) {
 // ---------------------------------------------------------------- real Mars ground
 // Fixed ids (above the colourful blocks) so saved worlds keep working.
 Object.assign(B, { DARKSAND: 120, TANROCK: 121, PALECLAY: 122, PURPLEROCK: 123, BLACKROCK: 124, FROST: 125, YELLOWSTONE: 126, GREENSTONE: 127 });
+Object.assign(B, { TRACKS: 128, SAND: 129 });
+def(B.TRACKS, { name: 'Red dirt', item: 'reddirt', tiles: { top: 'tracks', side: 'redSide', bottom: 'dust' }, time: 0.45 });
+def(B.SAND, { name: 'Sand', item: 'sand', tiles: 'sand', time: 0.5 });
+ITEMS.sand = { name: 'Sand', block: B.SAND };
 def(B.DARKSAND, { name: 'Dark sand', item: 'darksand', tiles: { top: 'darkSand', side: 'darkSandSide', bottom: 'darkSandSide' }, time: 0.5 });
 def(B.TANROCK, { name: 'Tan rock', item: 'tanrock', tiles: 'tanRock', time: 1.8 });
 def(B.PALECLAY, { name: 'Pale clay', item: 'paleclay', tiles: 'paleClay', time: 1.0 });

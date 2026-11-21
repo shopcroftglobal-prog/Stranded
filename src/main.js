@@ -9,6 +9,7 @@ import { createHooks } from './hooks.js';
 import { createQuests, dailyQuests, questText, questCoins, BADGES } from './quests.js';
 import { HOME_R, LEVELS, COSY_LIST, comfort, levelOf, atHome, giftReady, claimGift, updateGardens, growTime } from './home.js';
 import { World, CS, H, meshChunk, meshVolume } from './world.js';
+import { hash3 } from './noise.js';
 import { FAMILY_ITEMS, BUILD_COST, BUILD_RECIPES, recipeFor } from './blocks.js';
 import { COLOUR, FAMILIES } from './colours.js';
 import { PLANS, planBlocks } from './plans.js';
@@ -19,7 +20,7 @@ import { buildSky, Cloud, Bits } from './effects.js';
 import { PLANETS, planetById, gravityWords, tempWords, starWords, distanceWords, jumpWords } from './planets.js';
 import { worldParams } from './looks.js';
 import { createWater } from './water.js';
-import { createSunset, createAurora, createWeather, createPrints, createDaySky, createFarHills, createDustDevils } from './fx2.js';
+import { createSunset, createAurora, createWeather, createPrints, createDaySky, createFarHills, createDustDevils, createClouds, createPlumes } from './fx2.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -96,7 +97,7 @@ let composer = null, bloom = null;
 water = createWater(scene);
 const lavaSea = createWater(scene, { lava: true });
 const sunset = createSunset(scene), aurora = createAurora(scene), weather = createWeather(scene), prints = createPrints(scene);
-const daySky = createDaySky(scene), farHills = createFarHills(scene), devils = createDustDevils(scene);
+const daySky = createDaySky(scene), farHills = createFarHills(scene), devils = createDustDevils(scene), clouds = createClouds(scene), plumes = createPlumes(scene);
 let weatherT = 30, weatherOn = false;
 
 const atlas = buildAtlas();
@@ -154,6 +155,7 @@ function applyLook(id) {
   scene.background.set(k.top);
   if (lavaSea) lavaSea.setLevel(look.terrain.lava ? look.terrain.sea + 0.75 : null);
   if (prints) prints.clear();
+  if (plumes) plumes.reset();
   if (water) water.setLevel(look.terrain.liquid && !look.terrain.lava ? look.terrain.sea + 0.9 : null, look.planet.id === 'lhs1140b' ? 0x2f6688 : 0x23889a);
   sun.color.set(k.sun); sun.intensity = k.sunI;
   hemi.color.set(k.hemi[0]); hemi.groundColor.set(k.hemi[1]); hemi.intensity = k.hemi[2];
@@ -195,6 +197,36 @@ function setupWorld(save, arriving = false) {
   renderHotbar(); renderGoal();
 }
 
+// ---------------- pebbles: small loose stones lying on open ground (just for looks)
+const pebbleGeo = new THREE.IcosahedronGeometry(0.5, 0);
+const pebbleMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+const PEBBLE_ON = new Set([B.REDDIRT, B.DUST, B.DARKSAND, B.TANROCK, B.PALECLAY, B.BLACKROCK, B.SAND, B.TRACKS, B.FROST, B.ICE, B.SALT, B.STONE]);
+const PEBBLE_COLS = { mars: [0x5a4640, 0x7a6e68, 0x3a3236, 0x8a5a40, 0x9a8a80], moon: [0x8a8884, 0x5e5c5a, 0xb0aca4], europa: [0x8e7a6a, 0xb8b0a8, 0x6a5a50], proxima: [0x3a2a2a, 0x5a4440, 0x7a6a60], trappist1e: [0x5a5c56, 0x7a7c74, 0x8f9089], lhs1140b: [0x6a727c, 0x8d9298, 0xa8adb3] };
+const _pm = new THREE.Matrix4(), _pq = new THREE.Quaternion(), _pe = new THREE.Euler(), _pv = new THREE.Vector3(), _ps = new THREE.Vector3(), _pc = new THREE.Color();
+function makePebbles(c) {
+  const cols = PEBBLE_COLS[look.planet.id] || PEBBLE_COLS.mars, spots = [];
+  for (let lx = 0; lx < CS; lx++) for (let lz = 0; lz < CS; lz++) {
+    const x = c.cx * CS + lx, z = c.cz * CS + lz;
+    const r = hash3(x, 3, z, 201); if (r < 0.9) continue;
+    if (Math.hypot(x, z) < 9) continue;
+    let y = H - 1; while (y > 0 && !BLOCKS[c.data[lx + lz * CS + y * CS * CS]].solid) y--;
+    const id = c.data[lx + lz * CS + y * CS * CS];
+    if (!PEBBLE_ON.has(id) || (y + 1 < H && c.data[lx + lz * CS + (y + 1) * CS * CS] !== B.AIR)) continue;
+    const n = 1 + Math.floor(hash3(x, 4, z, 202) * 3);
+    for (let k = 0; k < n; k++) spots.push([lx + 0.15 + hash3(x, k, z, 203) * 0.7, y + 1, lz + 0.15 + hash3(x, k, z, 204) * 0.7, hash3(x, k, z, 205), hash3(x, k, z, 206)]);
+  }
+  if (!spots.length) return null;
+  const m = new THREE.InstancedMesh(pebbleGeo, pebbleMat, spots.length);
+  spots.forEach(([px, py, pz, a, b], i) => {
+    const sz = 0.12 + a * 0.26;
+    _pe.set(a * 3, b * 6, a * b * 2); _pq.setFromEuler(_pe);
+    _pm.compose(_pv.set(px, py + sz * 0.25, pz), _pq, _ps.set(sz * (1 + b * 0.5), sz * 0.6, sz));
+    m.setMatrixAt(i, _pm); m.setColorAt(i, _pc.set(cols[Math.floor(b * cols.length) % cols.length]));
+  });
+  m.castShadow = false; m.receiveShadow = true;
+  return m;
+}
+
 // ---------------- chunks ----------------
 function updateChunks(budgetMs) {
   const t0 = performance.now();
@@ -220,12 +252,14 @@ function updateChunks(budgetMs) {
       c.mesh.castShadow = c.mesh.receiveShadow = true;
       scene.add(c.mesh);
     }
+    if (c.pebbles) { c.mesh.remove(c.pebbles); c.pebbles.dispose(); c.pebbles = null; }
+    if (!race.active && (c.pebbles = makePebbles(c))) c.mesh.add(c.pebbles);
     c.dirty = false; done++;
   }
   // drop far chunks
   for (const [k, c] of world.chunks) {
     const d = Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz));
-    if (c.mesh && d > RENDER_R + 2) { scene.remove(c.mesh); c.mesh.geometry.dispose(); c.mesh = null; c.dirty = true; }
+    if (c.mesh && d > RENDER_R + 2) { scene.remove(c.mesh); c.mesh.geometry.dispose(); if (c.pebbles) { c.pebbles.dispose(); c.pebbles = null; } c.mesh = null; c.dirty = true; }
     if (d > RENDER_R + 5) world.chunks.delete(k);
   }
   return todo.length - done;
@@ -2047,11 +2081,16 @@ function updateLooks(dt) {
   const sk = sunset.update(camera.position, adv.sunDir, !inCamp || true);
   if (sk > 0.05) { scene.fog.color.set(fogBase).lerp(new THREE.Color(0xd8704a), sk * 0.35); } 
   // Mars: tan day sky with a blue sun glow, far mountains, dust devils on sunny days
-  const marsy = !!look.terrain.mars && !race.active;
+  const marsy = id === 'mars' && !race.active;
   const day = adv.daylight ?? 1, storm = !!(state.storm && state.storm.on);
   daySky.update(camera.position, adv.sunDir, day, marsy);
   farHills.update(camera.position, scene.fog.color, marsy);
   devils.update(dt, player.pos, (x, z) => world.surfaceY(x, z), marsy && !storm && playing ? Math.max(0, day * 1.4 - 0.4) : 0);
+  // high clouds where there is air; plumes on Europa
+  const air = look.planet.real.air;
+  const cloudK = air === 'none' || race.active ? 0 : (id === 'mars' ? 0.3 : 0.5) * (0.2 + 0.8 * day) * (storm ? 0.3 : 1);
+  clouds.update(dt, camera.position, cloudK, id === 'mars' ? 0xe4eeff : id === 'proxima' ? 0xffd8cc : 0xffffff);
+  plumes.update(dt, (x, z) => world.surfaceY(x, z), id === 'europa' && !race.active);
   const icy = id === 'europa' || id === 'lhs1140b' || id === 'moon';
   aurora.update(dt, camera.position, icy ? (adv.isDark() ? 1 : 0.35) * (id === 'moon' ? 0.6 : 1) : 0);
   // weather comes and goes

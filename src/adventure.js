@@ -167,7 +167,7 @@ export function createAdventure(G) {
   }
 
   // ---------------------------------------------------------------- day, night and storms
-  let daylight = 1;
+  let daylight = 1, haze = 0;
   function updateSky(dt) {
     const s = S(), id = W(), k = G.look.sky, len = DAY[id];
     if (len) {
@@ -189,8 +189,15 @@ export function createAdventure(G) {
     G.scene.background.set(k.top).multiplyScalar(dim);
     if (G.nightCover) G.nightCover.material.opacity = (1 - d) * 0.82;
     if (!fog0.far) { fog0.near = G.scene.fog.near; fog0.far = G.scene.fog.far; }
-    G.scene.fog.near = fog0.near * (1 - stormFx * 0.85);
-    G.scene.fog.far = fog0.far * (1 - stormFx * 0.7);
+    // the air gets hazy for a minute before a dust or snow storm, so you can get home in time
+    const st0 = s.storm, airy = G.look.planet.real.air !== 'none';
+    const hazeT = airy && st0 && !st0.on ? Math.max(0, 1 - st0.t / 60) : 0;
+    haze += (hazeT - haze) * Math.min(1, dt * 0.8);
+    if (haze > 0.01) G.scene.fog.color.lerp(new THREE.Color(id === 'mars' ? 0xb07a58 : 0xd8dee6).multiplyScalar(dim), haze * 0.5);
+    if (airy && st0 && !st0.on && st0.t < 60 && !st0.warned && G.active()) { st0.warned = true; G.toast(id === 'mars' ? 'The sky is getting hazy. A dust storm is on its way.' : 'The sky is getting hazy. A storm is on its way.'); }
+    if (st0 && st0.on) st0.warned = false;
+    G.scene.fog.near = fog0.near * (1 - stormFx * 0.85) * (1 - haze * 0.5);
+    G.scene.fog.far = fog0.far * (1 - stormFx * 0.7) * (1 - haze * 0.4);
     // night begins
     if (was >= 0.35 && daylight < 0.35 && G.active()) {
       G.toast('Night is falling. Stay near your base.');

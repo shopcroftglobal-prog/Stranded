@@ -189,3 +189,11 @@ Each new place is based on a real place on Mars:
 - The day sky is now butterscotch tan, and at sunrise and sunset the sky round the sun glows blue, like real Mars.
 - Far mountains on the horizon, and dust devils that wander across the plains on sunny days.
 - Screenshots: screenshots/mars-v21/. Test: test/mars.js.
+
+## Version 23: more real landscapes, on every world
+- Mars: pebbles and small stones on open ground; old rover tracks running east from near the ship to an old rover with a supply box on its back; thin blue-white clouds; the air turns hazy a minute before a dust storm (with a warning); the north ice cap far to the north (walk about 300 blocks), ice with dark dusty layers and curving valleys.
+- The Moon: dark flat lava seas (the maria), bright rays around young craters (like Tycho), a winding rille.
+- Europa: chaos ground, where the ice broke into rafts and froze again (Conamara Chaos), and tall water plumes shooting out of the ice.
+- Proxima b: small ash volcanoes. TRAPPIST-1e: sandy beaches and grey sea cliffs. LHS 1140 b: ice cliffs and blue crevasses.
+- Clouds on worlds with air. New block: Sand.
+- Screenshots: screenshots/worlds-v23/. Test: test/worlds2.js. The walkthrough bot now plays in first person.

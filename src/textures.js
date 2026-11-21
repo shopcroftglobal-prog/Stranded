@@ -388,13 +388,22 @@ Object.assign(TILES, {
   },
   // white frost (frozen air and water) on high, cold ground
   frost: (i, j) => (hash(i, j, 135) > 0.94 ? ['#ffffff', '#3a3a44'] : pick(['#f1edf0', '#e4e0e8', '#f8f6f8', '#dad5e0', '#ece4e4'], hash(Math.floor(i / 2), Math.floor(j / 2), 136))),
-  frostSide: (i, j) => (j < 3 + Math.floor(hash(i, 0, 137) * 2) ? pick(['#f1edf0', '#e4e0e8'], hash(i, j, 138)) : pick(PAL.redSide, hash(i, j, 139))),
+  frostSide: (i, j) => (j < 3 + Math.floor(hash(i, 0, 137) * 2) ? pick(['#f1edf0', '#e4e0e8'], hash(i, j, 138)) : j % 6 === 5 ? '#8a6a60' : pick(['#d6ccd0', '#cbc0c6', '#ddd4d8'], hash(i, j, 139))),
   // bright yellow crystals in pale rock (real: Curiosity cracked open a yellow rock)
   yellowStone: (i, j) => {
     const cl = [[4, 4, 2], [11, 3, 1], [8, 10, 2], [2, 12, 1], [13, 12, 1]];
     for (const [cx, cy, r] of cl) { const d = Math.abs(i - cx) + Math.abs(j - cy); if (d <= r) return d === 0 ? ['#fff6a0', '#6a5a00'] : (i <= cx ? '#f5d838' : '#d8b41e'); }
     return pick(['#e3cda4', '#d8be92', '#ecd9b4'], hash(i, j, 140));
   },
+  // old rover tracks pressed into red dirt: two rows of tread marks with little holes
+  tracks: (i, j) => {
+    const inTread = (i >= 2 && i <= 6) || (i >= 9 && i <= 13);
+    if (inTread && j % 4 < 2) return (j % 8 < 2 && (i === 4 || i === 11)) ? PAL.redTop[0] : pick(['#7e3218', '#8f381c'], hash(i, j, 143));
+    if (inTread) return pick(['#a94422', '#9e3f20'], hash(i, j, 144));
+    return pick(PAL.redTop, hash(i, j, 145));
+  },
+  // sand on a sea shore
+  sand: (i, j) => (hash(i, j, 146) > 0.93 ? '#8a7a5a' : pick(['#cdb27a', '#c4a870', '#d6bc86', '#bba068', '#dcc48e'], hash(i, j, 147))),
   // olive green rock (real: green crystals in Jezero crater)
   greenStone: (i, j) => (hash(i, j, 141) > 0.9 ? '#2c3018' : pick(['#6f7a3e', '#5f6a34', '#7f8a4a', '#55602e', '#8a9454'], hash(Math.floor(i / 2), Math.floor(j / 2), 142))),
 });
