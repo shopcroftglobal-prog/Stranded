@@ -178,7 +178,7 @@ From the title screen or the pause menu. Three tracks (Red dust loop, Ice canyon
 - A wave can no longer get stuck at "1 left" with nothing to hit.
 - Film mode (`?film`) lets the game be recorded frame by frame. The Mars walkthrough video is `mars-walkthrough.mp4`, made by `test/walkthrough.js`.
 
-## Version 21: real Mars landscapes and colours
+## Version 22: real Mars landscapes and colours
 Each new place is based on a real place on Mars:
 - A giant volcano to the north-east of the ship, with a crater on top, a cliff round its foot and frost on the summit (Olympus Mons). More volcanoes far away.
 - Deep winding canyons with striped walls (Valles Marineris).
