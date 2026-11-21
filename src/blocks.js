@@ -234,6 +234,26 @@ for (const f of FAMILIES) {
     COLOURFUL.push(id); FAMILY_ITEMS[f.id].push([c, item]);
   }
 }
+// ---------------------------------------------------------------- real Mars ground
+// Fixed ids (above the colourful blocks) so saved worlds keep working.
+Object.assign(B, { DARKSAND: 120, TANROCK: 121, PALECLAY: 122, PURPLEROCK: 123, BLACKROCK: 124, FROST: 125, YELLOWSTONE: 126, GREENSTONE: 127 });
+def(B.DARKSAND, { name: 'Dark sand', item: 'darksand', tiles: { top: 'darkSand', side: 'darkSandSide', bottom: 'darkSandSide' }, time: 0.5 });
+def(B.TANROCK, { name: 'Tan rock', item: 'tanrock', tiles: 'tanRock', time: 1.8 });
+def(B.PALECLAY, { name: 'Pale clay', item: 'paleclay', tiles: 'paleClay', time: 1.0 });
+def(B.PURPLEROCK, { name: 'Purple rock', item: 'purplerock', tiles: 'purpleRock', time: 2.0 });
+def(B.BLACKROCK, { name: 'Black rock', item: 'blackrock', tiles: 'blackRock', time: 2.4, tier: 1 });
+def(B.FROST, { name: 'Frost', item: 'ice', tiles: { top: 'frost', side: 'frostSide', bottom: 'dust' }, time: 0.4 });
+def(B.YELLOWSTONE, { name: 'Yellow stone', item: 'yellowstone', tiles: 'yellowStone', time: 2.0 });
+def(B.GREENSTONE, { name: 'Green stone', item: 'greenstone', tiles: 'greenStone', time: 2.0 });
+Object.assign(ITEMS, {
+  darksand: { name: 'Dark sand', block: B.DARKSAND },
+  tanrock: { name: 'Tan rock', block: B.TANROCK },
+  paleclay: { name: 'Pale clay', block: B.PALECLAY },
+  purplerock: { name: 'Purple rock', block: B.PURPLEROCK },
+  blackrock: { name: 'Black rock', block: B.BLACKROCK },
+  yellowstone: { name: 'Yellow stone', block: B.YELLOWSTONE, rare: true },
+  greenstone: { name: 'Green stone', block: B.GREENSTONE, rare: true },
+});
 // what each building block costs. `n` = how many you get.
 export const BUILD_COST = {
   wall: { need: { rock: 4, crystal: 1 }, n: 8, note: 'Smooth painted wall.' },

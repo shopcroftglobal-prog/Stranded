@@ -354,6 +354,50 @@ Object.assign(TILES, {
     return a < 2 ? '#2a6ab0' : a < 3 ? '#ffffff' : pick(['#4a90d8', '#4488d0'], hash(i, j, 94));
   },
 });
+// ---- real Mars ground: dark sand dunes, layered hills, volcano rock, frost, rare colours
+const band = (j, seed) => Math.floor((j + Math.floor(hash(0, Math.floor(j / 3), seed) * 2)) / 3);
+Object.assign(TILES, {
+  // dark grey-blue sand, like the dark dunes in Gale crater, with wind ripples
+  darkSand: (i, j) => ((j + Math.floor(i / 5)) % 5 === 0 && hash(i, j, 120) > 0.25 ? '#7d7a88' : pick(['#5b5865', '#504e5a', '#66636f', '#56535f', '#6e6b78'], hash(i, j, 121))),
+  darkSandSide: (i, j) => (j < 3 ? pick(['#5b5865', '#504e5a'], hash(i, j, 122)) : pick(['#47454f', '#403e48', '#4d4b56'], hash(i, j, 123))),
+  // tan rock in thin layers, with white veins (the light layered rock of Mount Sharp)
+  tanRock: (i, j) => {
+    if (hash(i, j, 119) > 0.965) return '#f4ecdc';
+    const b = band(j, 124);
+    return pick([['#c99a62', '#bf8f58', '#d1a26a'], ['#b8864e', '#ad7c46', '#c08e56'], ['#d8ad74', '#cfa36a', '#e0b67e'], ['#a97a48', '#9f7040', '#b28250']][b % 4], hash(Math.floor(i / 2), j, 125));
+  },
+  // pale cream clay
+  paleClay: (i, j) => {
+    const h = hash(i, j, 126);
+    if (h > 0.95) return '#b89a72';
+    if (h < 0.03) return '#fffaf0';
+    return pick(['#e3cda4', '#d8be92', '#ecd9b4', '#cdb184', '#f0e2c4'], hash(Math.floor(i / 3), Math.floor(j / 2), 128) * 0.6 + hash(i, j, 127) * 0.4);
+  },
+  // muted purple rock with little grey round pebbles
+  purpleRock: (i, j) => {
+    const pb = [[3, 4], [10, 2], [7, 9], [13, 12], [2, 13]];
+    for (const [cx, cy] of pb) { const d = Math.abs(i - cx) + Math.abs(j - cy); if (d === 0) return '#8d8d96'; if (d === 1) return '#5c5c66'; }
+    return pick(['#7c5a70', '#6e4e63', '#88667c', '#614458', '#946f86'], hash(Math.floor(i / 2), band(j, 129), 130) * 0.7 + hash(i, j, 131) * 0.3);
+  },
+  // black volcano rock full of tiny holes, dusted red here and there
+  blackRock: (i, j) => {
+    const h = hash(i, j, 132);
+    if (h > 0.9) return '#141217';
+    if (hash(Math.floor(i / 4), Math.floor(j / 4), 133) > 0.8 && h > 0.4) return pick(['#6e3a26', '#7c4430'], h);
+    return pick(['#2e2b31', '#37333a', '#28252b', '#403b42'], hash(Math.floor(i / 2), Math.floor(j / 2), 134));
+  },
+  // white frost (frozen air and water) on high, cold ground
+  frost: (i, j) => (hash(i, j, 135) > 0.94 ? ['#ffffff', '#3a3a44'] : pick(['#f1edf0', '#e4e0e8', '#f8f6f8', '#dad5e0', '#ece4e4'], hash(Math.floor(i / 2), Math.floor(j / 2), 136))),
+  frostSide: (i, j) => (j < 3 + Math.floor(hash(i, 0, 137) * 2) ? pick(['#f1edf0', '#e4e0e8'], hash(i, j, 138)) : pick(PAL.redSide, hash(i, j, 139))),
+  // bright yellow crystals in pale rock (real: Curiosity cracked open a yellow rock)
+  yellowStone: (i, j) => {
+    const cl = [[4, 4, 2], [11, 3, 1], [8, 10, 2], [2, 12, 1], [13, 12, 1]];
+    for (const [cx, cy, r] of cl) { const d = Math.abs(i - cx) + Math.abs(j - cy); if (d <= r) return d === 0 ? ['#fff6a0', '#6a5a00'] : (i <= cx ? '#f5d838' : '#d8b41e'); }
+    return pick(['#e3cda4', '#d8be92', '#ecd9b4'], hash(i, j, 140));
+  },
+  // olive green rock (real: green crystals in Jezero crater)
+  greenStone: (i, j) => (hash(i, j, 141) > 0.9 ? '#2c3018' : pick(['#6f7a3e', '#5f6a34', '#7f8a4a', '#55602e', '#8a9454'], hash(Math.floor(i / 2), Math.floor(j / 2), 142))),
+});
 // colourful blocks glow a little so they stay bright under any sky
 const glow = (fn) => (i, j) => { const v = fn(i, j); return v == null || Array.isArray(v) ? v : [v, shade(v, -0.72)]; };
 for (const [c, , hex] of COLOURS) {

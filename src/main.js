@@ -19,7 +19,7 @@ import { buildSky, Cloud, Bits } from './effects.js';
 import { PLANETS, planetById, gravityWords, tempWords, starWords, distanceWords, jumpWords } from './planets.js';
 import { worldParams } from './looks.js';
 import { createWater } from './water.js';
-import { createSunset, createAurora, createWeather, createPrints } from './fx2.js';
+import { createSunset, createAurora, createWeather, createPrints, createDaySky, createFarHills, createDustDevils } from './fx2.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -96,6 +96,7 @@ let composer = null, bloom = null;
 water = createWater(scene);
 const lavaSea = createWater(scene, { lava: true });
 const sunset = createSunset(scene), aurora = createAurora(scene), weather = createWeather(scene), prints = createPrints(scene);
+const daySky = createDaySky(scene), farHills = createFarHills(scene), devils = createDustDevils(scene);
 let weatherT = 30, weatherOn = false;
 
 const atlas = buildAtlas();
@@ -2039,6 +2040,12 @@ function updateLooks(dt) {
   const id = look.planet.id;
   const sk = sunset.update(camera.position, adv.sunDir, !inCamp || true);
   if (sk > 0.05) { scene.fog.color.set(fogBase).lerp(new THREE.Color(0xd8704a), sk * 0.35); } 
+  // Mars: tan day sky with a blue sun glow, far mountains, dust devils on sunny days
+  const marsy = !!look.terrain.mars && !race.active;
+  const day = adv.daylight ?? 1, storm = !!(state.storm && state.storm.on);
+  daySky.update(camera.position, adv.sunDir, day, marsy);
+  farHills.update(camera.position, scene.fog.color, marsy);
+  devils.update(dt, player.pos, (x, z) => world.surfaceY(x, z), marsy && !storm && playing ? Math.max(0, day * 1.4 - 0.4) : 0);
   const icy = id === 'europa' || id === 'lhs1140b' || id === 'moon';
   aurora.update(dt, camera.position, icy ? (adv.isDark() ? 1 : 0.35) * (id === 'moon' ? 0.6 : 1) : 0);
   // weather comes and goes

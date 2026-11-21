@@ -55,7 +55,7 @@ const PALS = {
 // Sky and light. sun: null = colour from the star's temperature.
 const SKIES = {
   mars: {
-    top: 0x020106, horizon: 0x4a2216, fog: 0x4a2216, stars: 1, sun: 0xffe2c4, sunI: 2.6,
+    top: 0x020106, horizon: 0x4a2216, fog: 0xb08262, stars: 1, sun: 0xffe2c4, sunI: 2.6,
     hemi: [0x8a6a8a, 0x3a1a10, 0.9], amb: [0xc08870, 0.45], exposure: 1.05, bodies: ['marsMoons'],
   },
   moon: {
@@ -94,6 +94,7 @@ export function worldParams(id) {
   };
   if (r.air === 'none') { t.craterChance = 0.85; t.cell = 40; t.craterVar = 12; }   // no air: nothing wears craters away
   if (r.air === 'thick') { t.craterChance = 0.25; t.craterDepth = 0.4; }
+  if (id === 'mars') t.mars = true;   // volcanoes, canyons, layered hills, dark dunes, frost (see world.js)
   if (id === 'moon') { t.glassRims = true; t.floorIce = 0.6; }
   if (id === 'europa') { t.craterChance = 0.18; t.cracks = true; t.iceShell = 7; t.amp *= 0.35; t.ridge *= 0.4; t.rocks = 0.5; }
   if (id === 'proxima') { t.freq = 0.016; t.amp *= 1.35; t.ridge *= 1.4; t.sea = 28; t.liquid = true; t.lava = true; }

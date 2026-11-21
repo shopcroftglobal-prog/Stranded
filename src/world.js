@@ -90,10 +90,68 @@ export class World {
       h += crack > 0.15 && crack < 0.75 ? 1 : 0;
     }
     const d0 = Math.hypot(x, z);
+    const mars = T.mars ? this.marsShape(x, z, h, d0) : null;
+    if (mars) h = mars.h;
     const flat = smooth(17, 10, d0);
     h = h * (1 - flat) + SPAWN_H * flat;
     if (d0 < 15) crack = 0;
-    return { h: Math.max(4, Math.min(H - 6, Math.floor(h))), floor, crystal, d0, rim, crack };
+    return { h: Math.max(4, Math.min(H - 6, Math.floor(h))), floor, crystal, d0, rim, crack, mars };
+  }
+
+  // Real Mars landscapes, each one based on a real place:
+  //  - a giant shield volcano with a crater on top and a cliff round its foot (Olympus Mons)
+  //  - a long deep canyon with striped walls (Valles Marineris)
+  //  - stepped, striped hills of tan, cream and purple rock (Mount Sharp in Gale crater)
+  //  - fields of dark grey sand dunes (the Bagnold dunes)
+  //  - white frost on the cold high ground
+  marsShape(x, z, h, d0) {
+    const n = this.noise;
+    const far = smooth(40, 80, d0);          // keep the ground round the ship as it was
+    let volc = 0, caldera = false, layer = 0, dune = 0, canyon = 0;
+    // volcanoes: one big one you can walk to from the ship, more far away
+    for (const v of this.volcanoes(x, z)) {
+      const d = Math.hypot(x - v.x, z - v.z) * (1 + 0.08 * n.n2(x * 0.03, z * 0.03));
+      if (d > v.r) continue;
+      const t = d / v.r;
+      let rise = v.hgt * Math.pow(1 - t, 1.25) + (t < 0.9 ? 4 * smooth(0.9, 0.84, t) : 0);
+      if (t < 0.16) { rise = v.hgt * Math.pow(1 - 0.16, 1.25) + 4 - 7 * smooth(0.16, 0.12, t); caldera = true; }
+      const k = smooth(1, 0.9, t);
+      if (rise * k > volc) volc = rise * k;
+    }
+    if (volc > 0) h = Math.max(h, 30 + volc);
+    // the canyon: a long winding crack, flat floor, steep walls
+    if (!volc) {
+      const c = Math.abs(n.n2(x * 0.0032 + 11.3, z * 0.0032 - 7.7) + 0.05 * n.n2(x * 0.03, z * 0.03));
+      canyon = smooth(0.2, 0.1, c) * smooth(60, 110, d0);
+      if (canyon > 0) h = h - canyon * Math.max(0, h - 9);
+      if (c < 0.26 && d0 > 60) layer = 1;
+    }
+    // layered hills: stepped like stairs
+    let m = n.n2(x * 0.0045 + 40.5, z * 0.0045 - 90.2);
+    const hill = Math.hypot(x + 70, z - 58); m = Math.max(m, 0.55 * smooth(46, 20, hill));   // one close to the ship
+    const mk = smooth(0.18, 0.4, m) * far * (1 - canyon) * (volc ? 0 : 1);
+    if (mk > 0) {
+      const raw = mk * (10 + 16 * smooth(0.3, 0.7, m + 0.12 * n.n2(x * 0.02, z * 0.02)));
+      const step = Math.floor(raw / 3) * 3 + smooth(0.75, 1, (raw / 3) % 1) * 3;
+      h += step; layer = Math.max(layer, smooth(0, 0.3, mk));
+    }
+    // dark dune fields on low flat ground
+    let dn = n.n2(x * 0.006 - 200.1, z * 0.006 + 130.4);
+    const field = Math.hypot(x - 52, z - 62); dn = Math.max(dn, 0.5 * smooth(40, 18, field));
+    dune = smooth(0.26, 0.4, dn) * smooth(14, 22, d0) * (1 - mk) * (volc ? 0 : 1) * (1 - canyon);
+    if (dune > 0) { const r = 1 - Math.abs(n.n2(x * 0.06 + 3.1, z * 0.022 - 1.7)); h += dune * r * r * r * 5; }
+    return { h, volc, caldera, layer, dune, canyon };
+  }
+
+  volcanoes(x, z) {
+    const out = [{ x: 105, z: -85, r: 82, hgt: 24 }];
+    const C = 420, gx = Math.floor(x / C), gz = Math.floor(z / C);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      const cx = gx + a, cz = gz + b;
+      if ((cx === 0 && cz === 0) || hash3(cx, 40, cz, 41) < 0.45) continue;
+      out.push({ x: cx * C + 100 + hash3(cx, 42, cz, 43) * (C - 200), z: cz * C + 100 + hash3(cx, 44, cz, 45) * (C - 200), r: 60 + hash3(cx, 46, cz, 47) * 40, hgt: 18 + hash3(cx, 48, cz, 49) * 8 });
+    }
+    return out;
   }
 
   generate(cx, cz) {
@@ -108,7 +166,16 @@ export class World {
         let id;
         const depth = top - y;
         if (y === 0 || (y === 1 && hash3(x, y, z, 8) > 0.4) || (y === 2 && hash3(x, y, z, 9) > 0.85)) { data[idx(lx, y, lz)] = B.DEEP; continue; }
-        if (depth === 0) id = B.REDDIRT;
+        const M = col.mars;
+        if (M && M.volc > 2 && depth > 0) id = depth <= 1 && hash3(x, y, z, 50) > 0.6 ? B.DUST : (n.n3(x * 0.1, y * 0.1, z * 0.1) > 0.45 ? B.STONE : B.BLACKROCK);
+        else if (M && M.volc > 2) { const pn = n.n2(x * 0.07 + 900, z * 0.07); id = top >= 50 && pn > -0.15 ? B.FROST : pn > 0.1 + M.volc * 0.02 ? B.REDDIRT : B.BLACKROCK; }
+        else if (M && M.dune > 0.25 && depth <= 2 + M.dune * 2) id = B.DARKSAND;
+        else if (M && M.layer > 0.3 && (depth > 0 || hash3(x, y, z, 52) > 0.45) && y > 8 && depth <= 16) {
+          const s = Math.floor((y + 1.5 * n.n2(x * 0.02, z * 0.02)) / 2);
+          id = [B.TANROCK, B.PALECLAY, B.TANROCK, B.PURPLEROCK, B.DUST, B.PALECLAY, B.REDDIRT][((s % 7) + 7) % 7];
+          if (id === B.PALECLAY && depth <= 1 && hash3(x, y, z, 53) > 0.985) id = B.YELLOWSTONE;
+        }
+        else if (depth === 0) id = M && top >= 48 ? B.FROST : B.REDDIRT;
         else if (depth <= dustDepth) id = B.DUST;
         else if (T.iceShell && depth <= dustDepth + T.iceShell && n.n3(x * 0.1, y * 0.1, z * 0.1) < 0.55) id = B.ICE;
         else {
@@ -124,6 +191,7 @@ export class World {
         if (O.glass && col.rim > 0.35 && depth <= 1 && n.n2(x * 0.15 + 500, z * 0.15) > 0.25) id = B.GLASS;
         if (O.salt && col.crack > 0.15 && depth <= 2 && hash3(x, y, z, 17) < 0.9) id = B.SALT;
         if (depth === 0 && id === B.REDDIRT && col.d0 > 9 && hash3(x, y, z, 13) > 0.94) id = B.ROCK;
+        if (col.mars && depth === 0 && id === B.REDDIRT && col.rim > 0.4 && n.n2(x * 0.12 + 700, z * 0.12) > 0.35) id = B.GREENSTONE;
         // tunnels
         if (y > 3 && y < top - 4 && col.d0 > 20) {
           const a = n.n3(x * 0.045, y * 0.07, z * 0.045), b = n.n3(x * 0.045 + 200, y * 0.07, z * 0.045);

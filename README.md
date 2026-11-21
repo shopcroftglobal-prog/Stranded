@@ -3,6 +3,10 @@
 Your ship came down hard. Pick a real world to crash on, dig, make tools, build the four missing parts and fly away.
 
 
+## New: see your pilot dig
+
+The camera now sits just over your pilot's right shoulder, so you watch them walk, swing their pickaxe or drill (it is in their hand) and fight. Each chop lands as the chips fly. The aim is still the cross in the middle of the screen, and you reach as far as before. Press **Y** (or **View** on phones) to look through your eyes instead; the game remembers your choice. Add `?eyes` to the link to start that way.
+
 ## New in steps 3 to 7
 
 - **Star map** (ship panel after the ship is fixed): fly between the six worlds. Trips cost Fuel cells (4 ice + 1 purple crystal). The Moon and Europa need only the repaired engine. Proxima b needs the Strong engine (1 Dragon scale). TRAPPIST-1e and LHS 1140 b need the Star engine (2 Dragon scales) and the Bigger fuel tank. Your bag flies with you. A world unlocks once you have been there.
@@ -70,6 +74,7 @@ Open **play.html** in Chrome, Edge or Firefox (double-click it; no install, work
 | Choose a block | 1 to 9, or the mouse wheel |
 | Bag and making things | E |
 | Fix the ship | F when you're next to it |
+| See your pilot, or look through your eyes | Y (View on phones) |
 | Pause | Esc |
 
 The game saves by itself in your browser. "Start over" is in the pause menu.
@@ -172,3 +177,15 @@ From the title screen or the pause menu. Three tracks (Red dust loop, Ice canyon
 - Wave creatures that fall into a pit or get stuck on a ledge hop back out next to you after 3 seconds.
 - A wave can no longer get stuck at "1 left" with nothing to hit.
 - Film mode (`?film`) lets the game be recorded frame by frame. The Mars walkthrough video is `mars-walkthrough.mp4`, made by `test/walkthrough.js`.
+
+## Version 21: real Mars landscapes and colours
+Each new place is based on a real place on Mars:
+- A giant volcano to the north-east of the ship, with a crater on top, a cliff round its foot and frost on the summit (Olympus Mons). More volcanoes far away.
+- Deep winding canyons with striped walls (Valles Marineris).
+- Stepped, striped hills of tan rock, pale clay and purple rock (Mount Sharp in Gale crater). One is just west of the ship.
+- Fields of dark grey sand dunes with wind ripples (the Bagnold dunes). One is south-east of the ship.
+- White frost on high, cold ground.
+- New blocks: Dark sand, Tan rock, Pale clay, Purple rock, Black rock, Frost (gives Ice), and two rare ones: Yellow stone (real: Curiosity cracked open a yellow rock in 2024) and Green stone (real: green crystals in Jezero crater).
+- The day sky is now butterscotch tan, and at sunrise and sunset the sky round the sun glows blue, like real Mars.
+- Far mountains on the horizon, and dust devils that wander across the plains on sunny days.
+- Screenshots: screenshots/mars-v21/. Test: test/mars.js.
