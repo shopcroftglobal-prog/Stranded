@@ -1055,7 +1055,7 @@ function renderBook() {
   }
   if (bookWorld === '_looks') {
     profile.owned = profile.owned || {};
-    $('bookSum').textContent = `Pick how you look. Others see your suit in the Friends' camp. Press Y to see yourself. You have ${profile.coins} coins.`;
+    $('bookSum').textContent = `Pick how you look. Others see your suit in the Friends' camp. Press Y to switch between seeing your pilot and looking through your eyes. You have ${profile.coins} coins.`;
     $('bookList').innerHTML = '';
     const rows = [
       ...Object.entries(LOOKS.suit).map(([k, c]) => ['suit', k, `${SUITS[k].name} suit`, c]),
@@ -1444,7 +1444,8 @@ function openSupply() {
 }
 function useAction() {
   if (launchT >= 0) return;
-  const fr = (inCamp || team) && friends.friendAt(eyeV, fwd);
+  const fr = (inCamp || team) && friends.friendAt(rayO, fwd, rayT0 + 4);
+  if (fr && rayT0) fr.t -= rayT0;
   if (fr && (!hit || fr.t < hit.t)) { openGift(fr.o); return; }
   if (aim && (!hit || aim.t < hit.t)) {
     if (aim.kind === 'trader') { openPanel('shopPanel'); return; }
@@ -1574,10 +1575,15 @@ function frame(filmDt, noDraw) {
   // what am I looking at
   camera.getWorldDirection(fwd);
   eyeV.copy(camera.position);
-  hit = playing && launchT < 0 ? world.raycast(eyeV, fwd, 5.5) : null;
-  aim = playing && launchT < 0 ? adv.pick(eyeV, fwd, 6) : null;
-  const frAim = (inCamp || team) && playing && friends.friendAt(eyeV, fwd);
-  updateBody(dt, fwd);
+  placeCam(dt, fwd);
+  // aim along the middle of the screen; reach is still measured from your eyes
+  hit = playing && launchT < 0 ? world.raycast(rayO, fwd, rayT0 + 5.5) : null;
+  if (hit && rayT0) { hit.t -= rayT0; if (hit.t < -1.2 || hit.t > 5.5) hit = null; }
+  aim = playing && launchT < 0 ? adv.pick(rayO, fwd, rayT0 + 6) : null;
+  if (aim && rayT0) { aim.t -= rayT0; if (aim.t < -1 || aim.t > 6) aim = null; }
+  let frAim = (inCamp || team) && playing && friends.friendAt(rayO, fwd, rayT0 + 4);
+  if (frAim && rayT0) frAim.t -= rayT0;
+  updateBody(dt);
   if (frAim && (!hit || frAim.t < hit.t)) {
     outline.visible = false;
     $('target').textContent = `${frAim.o.name || 'A friend'} · right click (or Use) to give a gift`;
@@ -2060,27 +2066,112 @@ function updateLooks(dt) {
   if (look.terrain.lava && playing && player.pos.y + 0.3 < lavaSea.level && !profile.free) { lavaT -= dt; if (lavaT <= 0) { lavaT = 0.6; adv.hurt(2, 'lava'); } }
 }
 let lavaT = 0;
-// ---- seeing yourself: a camera behind you (Y, or View on phones) shows your pilot, pet and Rover
-const eyeV = new THREE.Vector3();
-let behind = false, body = null, bodySuit = null;
-function toggleView() { if (!playing || race.active) return; behind = !behind; toast(behind ? 'Camera behind you. Press Y again to look through your eyes.' : 'Looking through your eyes.'); }
-function updateBody(dt, dir) {
+// ---- seeing yourself: the camera sits just over your right shoulder, so you watch your pilot dig,
+// fight and walk. Y (or View on phones) switches to looking through your eyes and back.
+const eyeV = new THREE.Vector3();      // where your eyes are
+const rayO = new THREE.Vector3();      // where the aim line starts (the camera)
+let rayT0 = 0;                         // how far along the aim line your eyes are
+let behind = params.has('eyes') ? false : settings.view !== 'eyes';
+let body = null, bodySuit = null, camDist = 4.1, digPh = 0, fightT = 0, digPose = 0;
+function toggleView() {
+  if (!playing || race.active) return;
+  behind = !behind; settings.view = behind ? 'behind' : 'eyes'; saveSettings();
+  toast(behind ? `Camera over your shoulder. ${TOUCH ? 'Tap View' : 'Press Y'} to look through your eyes.` : `Looking through your eyes. ${TOUCH ? 'Tap View' : 'Press Y'} to see yourself again.`);
+}
+const camR = new THREE.Vector3(), camWant = new THREE.Vector3(), camTo = new THREE.Vector3();
+function showingBody() { return behind && playing && launchT < 0 && !race.active; }
+// move the camera back over the shoulder, never through walls
+function placeCam(dt, dir) {
+  rayO.copy(eyeV); rayT0 = 0;
+  if (!showingBody()) return;
+  const want = player.rover ? 4.6 : 4.1, side = player.rover ? 0 : 0.95;
+  camR.set(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+  const head = camWant.copy(eyeV); head.y += 0.18;
+  camTo.copy(camR).multiplyScalar(side).addScaledVector(dir, -want); camTo.y += 0.7;
+  const len = camTo.length(); camTo.divideScalar(len);
+  const wall = world.raycast(head, camTo, len + 0.4);
+  const room = wall ? Math.max(0.35, wall.t - 0.3) : len;
+  const goal = Math.min(len, room) / len * want;
+  camDist = goal < camDist ? goal : camDist + (goal - camDist) * Math.min(1, dt * 4);   // snap in, ease out
+  const f = camDist / want;
+  camera.position.copy(head).addScaledVector(camTo, len * f);
+  camera.updateMatrixWorld();
+  rayO.copy(camera.position);
+  rayT0 = Math.max(0, camWant.copy(eyeV).sub(rayO).dot(dir));
+}
+// the tool in your pilot's hand is made from its picture, one little cube per pixel
+const handTools = {};
+function handTool(id) {
+  if (handTools[id] !== undefined) return handTools[id];
+  handTools[id] = null;
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas'); c.width = c.height = 16; const x = c.getContext('2d');
+    x.imageSmoothingEnabled = false; x.drawImage(img, 0, 0, 16, 16);
+    const d = x.getImageData(0, 0, 16, 16).data, px = [];
+    let gi = 0, gj = 15, gk = -99;
+    for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++) {
+      if (d[(j * 16 + i) * 4 + 3] < 128) continue;
+      px.push([i, j]); if (j - i > gk) { gk = j - i; gi = i; gj = j; }
+    }
+    const S = 0.85 / 16, mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(S * 1.8, S, S), new THREE.MeshLambertMaterial(), px.length);
+    const m = new THREE.Matrix4(), col = new THREE.Color();
+    px.forEach(([i, j], n) => {
+      const u = i - gi - 1, v = j - gj + 1;
+      m.makeTranslation(0, -v * S, u * S); mesh.setMatrixAt(n, m);
+      const k = (j * 16 + i) * 4; col.setRGB(d[k] / 255, d[k + 1] / 255, d[k + 2] / 255, THREE.SRGBColorSpace); mesh.setColorAt(n, col);
+    });
+    mesh.rotation.x = Math.PI * 0.75;   // the handle runs along the arm, the head at the far end
+    mesh.castShadow = true;
+    const g = new THREE.Group(); g.add(mesh); g.position.set(0, -8.6 / 16, 0.02);
+    handTools[id] = g;
+  };
+  img.src = icon(id);
+  return null;
+}
+let handNow = null;
+function bestTool() { let b = null; for (const k in state.inv) if (ITEMS[k].tool && (!b || ITEMS[k].tier > ITEMS[b].tier)) b = k; return b; }
+function updateBody(dt) {
   const want = profile.suit || 'sand';
-  if (!body || bodySuit !== want) { if (body) scene.remove(body); body = makePilot(want); bodySuit = want; scene.add(body); }
-  const show = behind && playing && launchT < 0 && !race.active;
+  if (!body || bodySuit !== want) { if (body) scene.remove(body); body = makePilot(want); bodySuit = want; handNow = null; body.traverse((o) => { if (o.isMesh) o.castShadow = true; }); scene.add(body); }
+  const show = showingBody() && camDist > 0.8;
   body.visible = show;
-  held.visible = held.visible && !show;
+  held.visible = held.visible && !showingBody();
   if (!show) return;
+  const rig = body.userData.rig;
   const sp = Math.hypot(player.vel.x, player.vel.z);
   body.position.set(player.pos.x, player.pos.y + (player.rover ? 0.45 : 0), player.pos.z);
   body.rotation.y = player.yaw + Math.PI;
   animate(body, clock.elapsedTime, player.rover ? 0 : Math.min(1, sp / 4));
-  // pull the camera back, but not through walls
-  const back = dir.clone().multiplyScalar(-1);
-  const wall = world.raycast(eyeV, back, 4.5);
-  const dist = Math.max(0.6, Math.min(4, wall ? wall.t - 0.35 : 4));
-  camera.position.copy(eyeV).addScaledVector(back, dist); camera.position.y += 0.3;
-  camera.updateMatrixWorld();
+  // what is in your hand: your weapon when fighting, your best digging tool the rest of the time
+  const fighting = mouse.left && aim && aim.kind === 'enemy' && (!hit || aim.t < hit.t);
+  if (fighting) fightT = 1.2; else fightT = Math.max(0, fightT - dt);
+  const holdId = fightT > 0 && profile.gear.weapon ? profile.gear.weapon : bestTool() || profile.gear.weapon;
+  const tool = holdId ? handTool(holdId) : null;
+  if (tool !== handNow) { if (handNow) rig.armL.remove(handNow); if (tool) rig.armL.add(tool); handNow = tool; }
+  // digging: wind up, then chop down, landing each time a chip flies off the block
+  const digging = dig.on && !dig.denied && hit && BLOCKS[hit.id].breakable;
+  const busy = digging || fighting || swingT > 0;
+  digPose += ((busy ? 1 : 0) - digPose) * Math.min(1, dt * 12);
+  if (busy) digPh = (digPh + dt / 0.34) % 1;
+  else digPh = 0;
+  const p = digPh, down = p < 0.55 ? 0 : (p - 0.55) / 0.45;     // slow lift, fast chop
+  const lift = p < 0.55 ? Math.sin(p / 0.55 * Math.PI / 2) : 1 - down * down;
+  const look = THREE.MathUtils.clamp(player.pitch, -1.2, 0.8);
+  const armA = -0.9 - lift * 1.7 + look * 0.55;                    // up over the head, then down in front
+  const wrist = -1.15 + digPose * (0.35 - lift * 0.5);
+  rig.armL.rotation.x = rig.armL.rotation.x * (1 - digPose) + armA * digPose;
+  rig.armL.rotation.z = -0.05 - digPose * 0.12;   // armL is the pilot's own right hand
+  if (handNow) handNow.rotation.x = wrist;
+  if (digPose > 0.01) {
+    rig.armR.rotation.x = rig.armR.rotation.x * (1 - digPose) + (-0.7 + look * 0.4 - lift * 0.25) * digPose;   // the other hand helps
+    rig.armR.rotation.z = 0.05 + digPose * 0.25;
+  }
+  // lean into the swing, and look where you aim
+  body.rotation.x = 0;
+    rig.head.rotation.x = -look * 0.6 + rig.head.rotation.x * 0.3;
+  if (!player.onGround && !player.rover && !player.fly) { rig.legL.rotation.x = -0.5; rig.legR.rotation.x = 0.25; }
+  if (rig.antTip) rig.antTip.rotation.z = Math.sin(clock.elapsedTime * 6) * 0.15 * (busy ? 1 : 0.3);
 }
 // ---- the Rover: hop in and drive. It climbs one block at a time and goes about three times walking speed.
 let roverM = null, roverLookNow = null;
@@ -2200,5 +2291,5 @@ window.__game = {
   start: () => { playing = true; $('hud').classList.remove('hide'); $('touch').classList.add('on'); for (const p of panels) $(p).classList.add('hide'); renderHotbar(); renderGoal(); },
   pending: () => updateChunks(50), landOn, get look() { return look; },
   hit: () => hit, mouse, keys, tch, TOUCH, dig, useAction, renderGoal, get launchT() { return launchT; },
-  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, frame, stepNow, findNear, canMake, RECIPES, ITEMS, PARTS, nearShip, SHIP_CENTER, SHIP_BASE, get playing() { return playing; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; },
+  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, frame, stepNow, findNear, canMake, RECIPES, ITEMS, PARTS, nearShip, SHIP_CENTER, SHIP_BASE, get playing() { return playing; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; }, get digPh() { return digPh; },
 };
