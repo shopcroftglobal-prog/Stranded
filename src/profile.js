@@ -2,9 +2,9 @@
 // ship upgrades, weapons you carry, and the Collection book. Saved in the browser.
 const KEY = 'stranded-profile-v1';
 
-export const WORLD_ORDER = ['mars', 'moon', 'europa', 'proxima', 'trappist1e', 'lhs1140b'];
+export const WORLD_ORDER = ['mars', 'moon', 'europa', 'proxima', 'trappist1e', 'lhs1140b', 'glass', 'tide', 'ring'];
 // How hard each world's waves are (creatures have more health and hit harder)
-export const WORLD_POWER = { mars: 1, moon: 1.35, europa: 1.7, proxima: 2.2, trappist1e: 2.7, lhs1140b: 3.2 };
+export const WORLD_POWER = { mars: 1, moon: 1.35, europa: 1.7, proxima: 2.2, trappist1e: 2.7, lhs1140b: 3.2, glass: 3.7, tide: 4.2, ring: 4.7 };
 
 const fresh = () => ({
   v: 1, coins: 0,

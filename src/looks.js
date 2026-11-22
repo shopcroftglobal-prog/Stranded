@@ -50,13 +50,40 @@ const PALS = {
     oreBase: ['#3d434b', '#373d44', '#454b53'],
     deep: ['#0f1216', '#14181d', '#0b0e12'], deepVein: '#22303e',
   },
+  glass: {
+    redTop: ['#5a6ab0', '#5060a4', '#6676bc', '#48589a', '#7484c8'],
+    redSide: ['#3e4a86', '#36427a', '#465294', '#2e3a6e'],
+    dust: ['#343c6a', '#2e3560', '#3a4374', '#282e56'], dustLine: '#1e2446',
+    stone: ['#2a2840', '#242238', '#302e48', '#1e1c32'], stoneFleck: '#4a4870',
+    rock: ['#a8b0d8', '#9aa2ca', '#b6bee4', '#8c94bc'], rockEdge: '#6a729a',
+    oreBase: ['#262440', '#201e38', '#2c2a48'],
+    deep: ['#0c0c18', '#10101e', '#0a0a14'], deepVein: '#2a2a5a',
+  },
+  tide: {
+    redTop: ['#ece4cc', '#e2d8bc', '#f4eedc', '#d8ccae', '#faf6ea'],
+    redSide: ['#cfc2a2', '#c4b694', '#d8ccae', '#b8aa88'],
+    dust: ['#b8a888', '#ac9c7c', '#c4b494', '#a09070'], dustLine: '#8a7a5c',
+    stone: ['#3e4a52', '#36424a', '#46525a', '#2e3a42'], stoneFleck: '#62707a',
+    rock: ['#9aa8b0', '#8c9aa2', '#a8b6be', '#7e8c94'], rockEdge: '#5e6c74',
+    oreBase: ['#34404a', '#2e3a44', '#3a4652'],
+    deep: ['#0e1418', '#12181e', '#0a1014'], deepVein: '#1e3a4a',
+  },
+  ring: {
+    redTop: ['#d8a64a', '#cc9a40', '#e2b258', '#c08e38', '#ecc068'],
+    redSide: ['#b0802e', '#a47628', '#ba8a36', '#966a22'],
+    dust: ['#8e6624', '#845c1e', '#987028', '#7a541a'], dustLine: '#6a4814',
+    stone: ['#4a3626', '#3e2d20', '#56402e', '#33261a'], stoneFleck: '#6a5038',
+    rock: ['#c8b8a0', '#bcac94', '#d4c4ac', '#b0a088'], rockEdge: '#8a7a62',
+    oreBase: ['#3d2d22', '#35271e', '#453428'],
+    deep: ['#1a120c', '#20160e', '#140e08'], deepVein: '#4a2a10',
+  },
 };
 
 // Sky and light. sun: null = colour from the star's temperature.
 const SKIES = {
   mars: {
     top: 0x020106, horizon: 0x4a2216, fog: 0xb08262, stars: 1, sun: 0xffe2c4, sunI: 2.6,
-    hemi: [0x8a6a8a, 0x3a1a10, 0.9], amb: [0xc08870, 0.45], exposure: 1.05, bodies: ['marsMoons'],
+    hemi: [0x8a6a8a, 0x3a1a10, 0.9], amb: [0xc08870, 0.45], exposure: 1.05, bodies: ['marsMoons', 'andromeda'],
   },
   moon: {
     top: 0x000000, horizon: 0x07070a, fog: 0x07070a, stars: 1, sun: 0xfff6ea, sunI: 3.2,
@@ -77,6 +104,18 @@ const SKIES = {
   lhs1140b: {
     top: 0x6a5a7c, horizon: 0xe2ae92, fog: 0xcf9f88, stars: 0, sun: null, sunI: 2.2,
     hemi: [0xf4dccc, 0x7a8a9a, 1.0], amb: [0xf0e2da, 0.6], exposure: 0.95, bodies: [],
+  },
+  glass: {
+    top: 0x060a22, horizon: 0x2a3a7a, fog: 0x2a3a74, stars: 0.8, sun: null, sunI: 3.0,
+    hemi: [0x8aa0ff, 0x1a1a3a, 0.95], amb: [0x9ab0ff, 0.5], exposure: 1.05, bodies: ['milkyway'],
+  },
+  tide: {
+    top: 0x3a6ab0, horizon: 0xb8d8f0, fog: 0xa8c8e0, stars: 0.15, sun: null, sunI: 2.0,
+    hemi: [0xd8ecff, 0x3a5a6a, 0.8], amb: [0xd0e4f4, 0.4], exposure: 0.85, bodies: ['milkyway'],
+  },
+  ring: {
+    top: 0x1a1030, horizon: 0xc88a5a, fog: 0xb07a50, stars: 0.6, sun: null, sunI: 2.8,
+    hemi: [0xffd8a8, 0x3a2414, 0.95], amb: [0xf0c898, 0.5], exposure: 1.05, bodies: ['milkyway', 'ring'],
   },
 };
 
@@ -104,6 +143,9 @@ export function worldParams(id) {
   if (id === 'europa') t.land = { chaos: true };
   if (id === 'proxima') t.land = { volcano: { cell: 150, chance: 0.6, rMin: 16, rVar: 14, hMin: 9, hVar: 9 } };
   if (id === 'trappist1e') t.land = { beach: true, mesa: { f: 0.006, coast: true, scale: 0.8 }, strata: 'grey' };
+  if (id === 'glass') { t.land = { mesa: { f: 0.006, scale: 1.1 }, strata: 'grey', volcano: { cell: 220, chance: 0.5, rMin: 24, rVar: 18, hMin: 10, hVar: 10 }, rays: true }; t.crystalCrater = 0.7; }
+  if (id === 'tide') { t.sea = 31; t.liquid = true; t.rocks = 0.5; t.land = { beach: true, mesa: { f: 0.006, coast: true, scale: 1.2 }, strata: 'grey' }; }
+  if (id === 'ring') t.land = { dunes: {}, mesa: { f: 0.004 }, strata: 'mars', canyon: { f: 0.0035, w: 0.15, floor: 10, depth: 99, strata: true } };
   if (id === 'lhs1140b') t.land = { canyon: { f: 0.005, w: 0.06, floor: 8, depth: 12, strata: true }, mesa: { f: 0.005, scale: 0.9 }, strata: 'ice', frostAbove: 40 };
   if (id === 'moon') { t.glassRims = true; t.floorIce = 0.6; }
   if (id === 'europa') { t.craterChance = 0.18; t.cracks = true; t.iceShell = 7; t.amp *= 0.35; t.ridge *= 0.4; t.rocks = 0.5; }
@@ -115,7 +157,7 @@ export function worldParams(id) {
   const ores = {
     iron: clamp(0.52 + (3.93 - r.density) * 0.045, 0.42, 0.6),
     ice: clamp(0.66 + (r.tempC + 65) * 0.004 - (r.water ? 0.1 : 0), 0.5, 0.82),
-    crystal: id === 'moon' ? 0.7 : 0.64,
+    crystal: id === 'moon' ? 0.7 : id === 'glass' ? 0.56 : 0.64,
     gold: p.rare.some(x => x.ore === 'gold') ? clamp(0.8 - (r.density - 5) * 0.08, 0.68, 0.8) : 2,
     salt: p.rare.some(x => x.ore === 'salt'),
     glass: p.rare.some(x => x.ore === 'glass'),

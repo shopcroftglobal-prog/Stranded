@@ -19,7 +19,7 @@ export const STAGES = [
 ];
 export const stageOf = (n) => STAGES[Math.min(4, Math.floor((n - 1) / 10))];
 // real day length (scaled down). Worlds that always face their star have no night.
-const DAY = { mars: 14 * 60, moon: 30 * 60, europa: 16 * 60 };
+const DAY = { mars: 14 * 60, moon: 30 * 60, europa: 16 * 60, glass: 12 * 60, tide: 16 * 60, ring: 10 * 60 };
 export const DRAGONS = {
   mars: { name: 'Dust dragon', hp: 420, speed: 3.0, special: 'gust', says: 'The Dust dragon comes out of the storm!' },
   moon: { name: 'Crater dragon', hp: 460, speed: 2.6, special: 'leap', says: 'The Crater dragon leaps down from the crater rim!' },
@@ -27,24 +27,27 @@ export const DRAGONS = {
   proxima: { name: 'Red sun dragon', hp: 540, speed: 2.8, special: 'flare', says: 'The star flares. The Red sun dragon wakes!' },
   trappist1e: { name: 'Sea dragon', hp: 560, speed: 3.2, special: 'dive', says: 'The Sea dragon rises out of the frozen sea!' },
   lhs1140b: { name: 'Stone dragon', hp: 700, speed: 1.7, special: 'pound', says: 'The ground shakes. The Stone dragon is coming!' },
+  glass: { name: 'Crystal dragon', hp: 800, speed: 2.8, special: 'shards', says: 'The crystal plain cracks open. The Crystal dragon rises!' },
+  tide: { name: 'Wave dragon', hp: 880, speed: 3.2, special: 'dive', says: 'The sea boils. The Wave dragon is here!' },
+  ring: { name: 'Gold dragon', hp: 960, speed: 3.0, special: 'gust', says: 'A shadow falls across the ring. The Gold dragon comes down!' },
 };
 
 // Friendly finds: where they live and what they give
 export const FINDS = {
   hopper: { name: 'Hopper', make: () => makeHopper('rust'), worlds: ['mars'], w: 6, speed: 2.2, says: 'Hopper dug up some ice for you!' },
   crab: { name: 'Rock crab', make: (w) => makeRockCrab(w === 'moon' ? 'frost' : w === 'proxima' ? 'sand' : 'rock'), worlds: ['mars', 'moon', 'proxima', 'trappist1e'], w: 3, speed: 1.2 },
-  jelly: { name: 'Glow jelly', make: () => makeGlowJelly('ice'), worlds: ['europa', 'lhs1140b'], w: 3, speed: 0.8, float: 1.2, says: 'The Glow jelly filled your air!' },
+  jelly: { name: 'Glow jelly', make: () => makeGlowJelly('ice'), worlds: ['europa', 'lhs1140b', 'glass'], w: 3, speed: 0.8, float: 1.2, says: 'The Glow jelly filled your air!' },
   snail: { name: 'Salt snail', make: () => makeGemSnail('blue'), worlds: ['europa'], w: 3, speed: 0.3, says: 'The Salt snail left a trail of salt.' },
-  mole: { name: 'Gold mole', make: () => makeDiggerMole('cocoa'), worlds: ['proxima', 'lhs1140b'], w: 1.2, speed: 1.4, says: 'The Gold mole dug up gold!' },
+  mole: { name: 'Gold mole', make: () => makeDiggerMole('cocoa'), worlds: ['proxima', 'lhs1140b', 'ring'], w: 1.2, speed: 1.4, says: 'The Gold mole dug up gold!' },
   puff: { name: 'Dust puff', make: () => makeDustPuff('rust'), worlds: ['mars'], w: 3, speed: 3.0, storm: true, says: 'You caught a Dust puff. It shook out a fuel cell!' },
-  fish: { name: 'Ice fish', make: (w, gold) => makeIceFish(gold ? 'golden' : 'blue'), worlds: ['europa', 'trappist1e', 'lhs1140b'], w: 4, speed: 0.6, ice: true },
+  fish: { name: 'Ice fish', make: (w, gold) => makeIceFish(gold ? 'golden' : 'blue'), worlds: ['europa', 'trappist1e', 'lhs1140b', 'tide'], w: 4, speed: 0.6, ice: true },
   moth: { name: 'Star moth', make: () => makeLuckyMoth('moon'), worlds: 'all', w: 1.2, speed: 1.6, float: 1.6, dark: true, says: 'The Star moth grants a wish: double rewards on your next wave!' },
   beetle: { name: 'Shiny beetle', make: () => makeGoldBeetle('jade'), worlds: 'all', w: 1.5, speed: 3.6, deep: true, flee: true, says: 'You caught a Shiny beetle. It left a Gem!' },
   bunny: { name: 'Crater bunny', make: () => makeCraterBunny('grey'), worlds: ['moon'], w: 4, speed: 2.6, says: 'The Crater bunny dug up 2 Orange glass for you!' },
   robot: { name: 'Lost robot', make: () => makeLostRobot('rusty'), worlds: 'all', w: 0.6, speed: 0.7, says: 'You fixed the Lost robot with a Metal sheet. It gave you a Gem and 60 coins!' },
   ray: { name: 'Sky ray', make: () => makeSkyRay('sea'), worlds: ['trappist1e'], w: 2, speed: 2.5, fly: true, says: 'The Sky ray dropped a treasure box!' },
 };
-export const RARE_OF = { mars: [], moon: ['glass'], europa: ['salt'], proxima: ['gold'], trappist1e: [], lhs1140b: ['gold'] };
+export const RARE_OF = { mars: [], moon: ['glass'], europa: ['salt'], proxima: ['gold'], trappist1e: [], lhs1140b: ['gold'], glass: ['gold'], tide: ['gold'], ring: ['gold'] };
 
 const rnd = Math.random;
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);

@@ -6,7 +6,7 @@ import { makeRover, makePilot, animate, SUITS } from './characters.js';
 const LOOKS = { suit: { sand: 0, sea: 100, sun: 100, berry: 250, frost: 250, lime: 300, rust: 400, racing: 500,
   night: { gems: 3 }, glowline: { gems: 4 }, lava: { gems: 5 },
   redplanet: { set: 'mars' }, moondust: { set: 'moon' }, icecrystal: { set: 'europa' }, redsun: { set: 'proxima' }, deepsea: { set: 'trappist1e' }, snow: { set: 'lhs1140b' },
-  gold: { all: true }, dragon: { dragon: true } }, rover: { sun: 0, sea: 150, berry: 150 } };
+  gold: { all: true }, dragon: { dragon: true }, star: { galaxy: true } }, rover: { sun: 0, sea: 150, berry: 150 } };
 import { createPets, caughtPets, PET_GIFTS } from './pets.js';
 import { createHooks } from './hooks.js';
 import { createQuests, dailyQuests, questText, questCoins, BADGES } from './quests.js';
@@ -234,7 +234,7 @@ function setupWorld(save, arriving = false) {
 const pebbleGeo = new THREE.IcosahedronGeometry(0.5, 0);
 const pebbleMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
 const PEBBLE_ON = new Set([B.REDDIRT, B.DUST, B.DARKSAND, B.TANROCK, B.PALECLAY, B.BLACKROCK, B.SAND, B.TRACKS, B.FROST, B.ICE, B.SALT, B.STONE]);
-const PEBBLE_COLS = { mars: [0x5a4640, 0x7a6e68, 0x3a3236, 0x8a5a40, 0x9a8a80], moon: [0x8a8884, 0x5e5c5a, 0xb0aca4], europa: [0x8e7a6a, 0xb8b0a8, 0x6a5a50], proxima: [0x3a2a2a, 0x5a4440, 0x7a6a60], trappist1e: [0x5a5c56, 0x7a7c74, 0x8f9089], lhs1140b: [0x6a727c, 0x8d9298, 0xa8adb3] };
+const PEBBLE_COLS = { glass: [0x8a94c8, 0x3a3a6a, 0xb8a0ff], tide: [0x9aa8b0, 0x5e6c74, 0xe8e0d0], ring: [0x8a6a3a, 0xc8b8a0, 0x5a4028], mars: [0x5a4640, 0x7a6e68, 0x3a3236, 0x8a5a40, 0x9a8a80], moon: [0x8a8884, 0x5e5c5a, 0xb0aca4], europa: [0x8e7a6a, 0xb8b0a8, 0x6a5a50], proxima: [0x3a2a2a, 0x5a4440, 0x7a6a60], trappist1e: [0x5a5c56, 0x7a7c74, 0x8f9089], lhs1140b: [0x6a727c, 0x8d9298, 0xa8adb3] };
 const _pm = new THREE.Matrix4(), _pq = new THREE.Quaternion(), _pe = new THREE.Euler(), _pv = new THREE.Vector3(), _ps = new THREE.Vector3(), _pc = new THREE.Color();
 function makePebbles(c) {
   const cols = PEBBLE_COLS[look.planet.id] || PEBBLE_COLS.mars, spots = [];
@@ -687,8 +687,10 @@ function renderBeacon() {
 // ---- Forge
 function renderForge() {
   const list = $('forgeList'); list.innerHTML = '';
-  for (const r of FORGE_RECIPES) {
-    const it = ITEMS[r.out], owned = profile.owned[r.out];
+  let finalHead = false;
+  for (const r of [...FORGE_RECIPES.filter(r => !r.final), ...FORGE_RECIPES.filter(r => r.final)]) {
+    if (r.final && !finalHead) { finalHead = true; const h = document.createElement('div'); h.className = 'fhead'; h.innerHTML = `<b>Final mission: make antimatter</b><span>${finalLine()}</span>`; list.appendChild(h); }
+    const it = ITEMS[r.out], owned = !r.final && profile.owned[r.out];
     const row = document.createElement('div'); row.className = 'recipe' + (r.legend ? ' legend' : '');
     const needs = Object.entries(r.need).map(([k, n]) => `<span class="${has(k) >= n ? 'have' : 'miss'}">${ITEMS[k].name} ${Math.min(has(k), n)}/${n}</span>`).join(' · ');
     row.innerHTML = `<img src="${icon(r.out)}" alt=""><div><div class="nm">${it.name}${it.dmg ? ` <small>hits ${it.dmg}</small>` : ''}</div><div class="needs">${needs}</div><div class="note">${r.note}</div></div>`;
@@ -697,6 +699,13 @@ function renderForge() {
     b.onclick = () => {
       if (!canMake(r)) return;
       for (const [k, n] of Object.entries(r.need)) take(k, n);
+      if (r.final) {
+        give(r.out, 1); profile.final = profile.final || {}; profile.final[r.out] = (profile.final[r.out] || 0) + 1;
+        saveProfile(); sfx.craft(); renderForge(); writeSave();
+        if (r.out === 'antimatter') { banner('Antimatter cell made!', has('antimatter') >= 2 ? 'You have 2 cells. Open the star map (M) and fit the Galaxy drive!' : 'The Galaxy drive needs 2. Make one more.'); bits.burst(player.pos.x - 0.5, player.pos.y + 1, player.pos.z - 0.5, GOLDS); }
+        else toast(`Made a ${it.name}!`);
+        return;
+      }
       profile.owned[r.out] = true;
       if (r.legend && /^Legendary/.test(r.note)) G.track('legend');
       const slot = it.weapon ? 'weapon' : 'shield', lvl = it.weapon || it.shield;
@@ -771,7 +780,16 @@ function renderMap() {
   x.font = '12px monospace';
   for (const [k, st] of Object.entries(STARS)) {
     const a = st.ra / 24 * Math.PI * 2 - Math.PI / 2, r = st.ly ? 30 + Math.log10(1 + st.ly) * 70 : 0;
-    const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r;
+    let px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r;
+    if (st.galaxy) {
+      // far, far away: drawn in the corner with a little spiral
+      px = Wd - 60; py = Ht - 52;
+      for (let i = 0; i < 160; i++) { const t = i / 160 * 3, aa = t * 2 + (i % 2) * Math.PI, rr = 2 + t * 6; x.fillStyle = `rgba(200,210,255,${0.7 - t * 0.2})`; x.fillRect(px + Math.cos(aa) * rr, py + Math.sin(aa) * rr * 0.55, 1, 1); }
+      x.strokeStyle = 'rgba(200,210,255,0.35)'; x.setLineDash([3, 4]); x.beginPath(); x.moveTo(cx, cy); x.lineTo(px, py); x.stroke(); x.setLineDash([]);
+      if (st.worlds.includes(here)) { x.strokeStyle = '#7be39a'; x.beginPath(); x.arc(px, py, 14, 0, Math.PI * 2); x.stroke(); }
+      x.fillStyle = '#d8e0ff'; x.fillText('Andromeda', px - 34, py + 22); x.font = '10px monospace'; x.fillText('2.5 million ly', px - 40, py + 34); x.font = '12px monospace';
+      continue;
+    }
     const hereStar = st.worlds.includes(here);
     x.fillStyle = k === 'sun' ? '#ffe08a' : '#ff8a5a';
     x.beginPath(); x.arc(px, py, k === 'sun' ? 6 : 4, 0, Math.PI * 2); x.fill();
@@ -783,7 +801,7 @@ function renderMap() {
     const p = planetById(id), c = canFly(here, id, has);
     const st = STARS[starOf(id)];
     const row = document.createElement('div'); row.className = 'recipe' + (id === here ? ' part' : '');
-    const dist = st.ly ? `${st.ly} light years away, at ${st.name}` : 'In our Solar System';
+    const dist = st.galaxy ? 'In the Andromeda galaxy, 2.5 million light years away (a made-up world)' : st.ly ? `${st.ly} light years away, at ${st.name}` : 'In our Solar System';
     row.innerHTML = `<div class="dot" style="background:#${worldParams(id).sky.sun.toString(16).padStart(6, '0')}"></div><div><div class="nm">${p.name}${profile.visited[id] ? ' <small class="good">visited</small>' : ''}</div><div class="needs">${dist} · waves ${wavesOn(id)}/${LAST_WAVE}</div><div class="note">${id === here ? 'You are here.' : c.ok ? 'Costs ' + c.why : c.why}</div></div>`;
     const b = document.createElement('button'); b.textContent = id === here ? (mapFromWin ? 'Land here' : 'Here') : 'Fly';
     b.disabled = id === here ? !mapFromWin : !c.ok;
@@ -819,7 +837,7 @@ function travel(dest) {
   world.setStructure(shipBlocks(state.fixed));
   writeSave();
   const p = planetById(dest), st = STARS[starOf(dest)];
-  $('travelText').innerHTML = `Flying to <b>${p.name}</b><br><span class="sub">${st.ly ? st.ly + ' light years' : 'across the Solar System'}</span>`;
+  $('travelText').innerHTML = `Flying to <b>${p.name}</b><br><span class="sub">${st.galaxy ? 'The Galaxy drive burns antimatter... 2.5 million light years to the Andromeda galaxy' : st.ly ? st.ly + ' light years' : 'across the Solar System'}</span>`;
   openPanel('travel');
   setTimeout(() => {
     applyLook(dest);
@@ -830,6 +848,11 @@ function travel(dest) {
     Object.assign(player.pos, { x: -6.5, y: world.surfaceY(-7, 6) + 1, z: 6.5 });
     player.yaw = Math.atan2(-(SHIP_CENTER.x - player.pos.x), -(SHIP_CENTER.z - player.pos.z)); player.pitch = -0.1;
     renderHotbar(); renderGoal(); writeSave();
+    if (p.galaxy && !profile.galaxyDone) {
+      profile.galaxyDone = Date.now(); profile.coins += 3000; saveProfile(); renderStatus();
+      setTimeout(() => { banner('You left the Milky Way!', 'Final mission complete. You crossed 2.5 million light years to the Andromeda galaxy. +3000 coins and the Star traveller suit. Three new worlds to explore.'); sfx.win(); bits.burst(player.pos.x - 0.5, player.pos.y + 1, player.pos.z - 0.5, GOLDS); }, 1800);
+      unlockSuit('star', 'You reached another galaxy.');
+    }
     updateChunks(200);
     closePanels();
     banner(`Welcome to ${p.name}`, p.blurb); playMusic(p.id);
@@ -1092,7 +1115,7 @@ function renderBook() {
   const ids = WORLD_ORDER.filter(id => profile.visited[id]);
   if (!bookWorld || (!ids.includes(bookWorld) && bookWorld[0] !== '_')) bookWorld = '_quests';
   const dq = dailyQuests(), ready = dq.quests.filter(q => q.have >= q.need && !q.claimed).length;
-  $('bookTabs').innerHTML = [['_quests', `Daily quests${ready ? ` (${ready}!)` : ''}`], ['_badges', 'Badges'], ['_shop', 'Shop'], ['_pets', 'Pets'], ['_looks', 'Looks'], ['_treasures', `Treasures (${treasures ? treasures.total() : 0}/${ALL_COUNT})`], ...ids.map(id => [id, planetById(id).name])]
+  $('bookTabs').innerHTML = [['_quests', `Daily quests${ready ? ` (${ready}!)` : ''}`], ['_final', profile.galaxyDone ? 'Final mission ✓' : 'Final mission'], ['_badges', 'Badges'], ['_shop', 'Shop'], ['_pets', 'Pets'], ['_looks', 'Looks'], ['_treasures', `Treasures (${treasures ? treasures.total() : 0}/${ALL_COUNT})`], ...ids.map(id => [id, planetById(id).name])]
     .map(([id, n]) => `<button class="${id === bookWorld ? 'on' : ''}" data-w="${id}">${n}</button>`).join('');
   $('bookTabs').querySelectorAll('button').forEach(b => b.onclick = () => { bookWorld = b.dataset.w; renderBook(); });
   if (bookWorld === '_quests') {
@@ -1141,7 +1164,7 @@ function renderBook() {
     const gems = has('gem');
     $('bookSum').textContent = `Pick how you look. Others see your suit in the Friends' camp and in races. Press Y to switch between seeing your pilot and looking through your eyes. You have ${profile.coins} coins and ${gems} Gems.`;
     $('bookList').innerHTML = '';
-    const how = (c) => typeof c === 'number' ? `${c} coins` : c.gems ? `${c.gems} Gems` : c.set ? `Find all treasures on ${planetById(c.set).name}` : c.all ? 'Find every treasure on every world' : 'Beat a dragon';
+    const how = (c) => typeof c === 'number' ? `${c} coins` : c.gems ? `${c.gems} Gems` : c.set ? `Find all treasures on ${planetById(c.set).name}` : c.all ? 'Find every treasure on every world' : c.galaxy ? 'Finish the final mission' : 'Beat a dragon';
     const rows = [
       ...Object.entries(LOOKS.suit).map(([k, c]) => ['suit', k, `${SUITS[k].name} suit`, c]),
       ...(profile.rover ? Object.entries(LOOKS.rover).map(([k, c]) => ['rover', k, `${{ sun: 'Sun', sea: 'Sea', berry: 'Berry' }[k]} Rover`, c]) : []),
@@ -1165,6 +1188,18 @@ function renderBook() {
       };
       row.appendChild(btn); $('bookList').appendChild(row);
     }
+    return;
+  }
+  if (bookWorld === '_final') {
+    const st = finalSteps(), n = st.filter(x => x.done).length;
+    $('bookSum').innerHTML = `<b>Leave our galaxy.</b> Antimatter is the strongest fuel there is: a tiny bit holds more power than a whole tank. Mine special minerals on different worlds, forge them into parts at a Forge, and build 2 Antimatter cells. They power the Galaxy drive, which can cross 2.5 million light years to the Andromeda galaxy, with new stars and three new worlds. ${n} of ${st.length} steps done.`;
+    $('bookList').innerHTML = '';
+    st.forEach((x, i) => {
+      const row = document.createElement('div'); row.className = 'quest fin' + (x.done ? ' done' : '');
+      const ic = ITEMS[x.k] ? `<img class="fic" src="${icon(x.k)}" alt="">` : `<i class="swatch" style="background:${x.k === 'fly' ? '#8a9cff' : '#e8b23c'}"></i>`;
+      row.innerHTML = `${ic}<div>${i + 1}. ${x.head} <small class="sub">(${x.where})</small><br><small class="sub">${x.done ? 'Done!' : x.text}</small></div>`;
+      $('bookList').appendChild(row);
+    });
     return;
   }
   if (bookWorld === '_treasures') {
@@ -2135,6 +2170,27 @@ function updateFinder(dt) {
   return true;
 }
 // one short line at the top that always says what to do now
+// ---- the final mission: antimatter to cross to another galaxy
+function finalSteps() {
+  const f = profile.final || {}, made = (k) => (f[k] || 0) > 0 || has(k) > 0;
+  const am = (f.antimatter || 0) >= 2 || has('antimatter') >= 2 || profile.ship.engine >= 4;
+  const trap = made('trap') || made('antimatter');
+  return [
+    { k: 'magnet', done: made('magnet') || trap, head: 'Magnet ring', where: 'Mars', text: 'Dig iron and the rare yellow stone on Mars. Forge a Magnet ring.' },
+    { k: 'lens', done: made('lens') || trap, head: 'Focus lens', where: 'The Moon or TRAPPIST-1e', text: 'Make glass and dig sand. Forge a Focus lens.' },
+    { k: 'coldcore', done: made('coldcore') || trap, head: 'Cold core', where: 'Europa', text: 'Dig salt and ice on Europa. Forge a Cold core.' },
+    { k: 'heatshield', done: made('heatshield') || trap, head: 'Heat shield', where: 'Proxima b or LHS 1140 b', text: 'Dig black rock and gold. Forge a Heat shield.' },
+    { k: 'trap', done: trap, head: 'Antimatter trap', where: 'Any Forge', text: 'Put the four parts together into an Antimatter trap.' },
+    { k: 'powercrystal', done: made('powercrystal') || am, head: 'Power crystals', where: 'Any world', text: 'Forge Power crystals from purple crystals and Gems.' },
+    { k: 'antimatter', done: am, head: '2 Antimatter cells', where: 'Any Forge', text: 'Each cell needs a trap, a power crystal and a dragon scale. Make 2.' },
+    { k: 'drive', done: profile.ship.engine >= 4, head: 'Galaxy drive', where: 'Star map (M)', text: 'Fit the Galaxy drive to your ship.' },
+    { k: 'fly', done: !!profile.galaxyDone, head: 'Fly to Andromeda', where: 'Star map (M)', text: 'Cross 2.5 million light years to a new galaxy.' },
+  ];
+}
+function finalLine() {
+  const st = finalSteps(), n = st.filter(s => s.done).length, next = st.find(s => !s.done);
+  return next ? `Step ${n + 1} of ${st.length}: ${next.text}` : 'Done! You reached the Andromeda galaxy.';
+}
 function renderMission() {
   const el = $('mission');
   if (!playing || inCamp || race.active || !state) { el.classList.add('hide'); return; }
@@ -2144,7 +2200,10 @@ function renderMission() {
     const n = PARTS.filter(p => state.fixed[p.id]).length;
     head = `Mission ${Math.min(4, n + 1)} of 4: fix your ship`;
     txt = stepNow().text.split(/(?<=[.!?])\s/)[0];
-  } else { head = `Mission: wave ${wavesOn(look.planet.id) + 1} of ${LAST_WAVE}`; txt = nextTip().split(/(?<=[.!?])\s/)[0]; }
+  } else if (!profile.galaxyDone && !adv.wave && (profile.final || wavesOn(look.planet.id) >= 10) && (wavesOn(look.planet.id) >= LAST_WAVE || Math.floor(Date.now() / 12000) % 2 === 0)) {
+    if (!profile.finalIntro) { profile.finalIntro = 1; saveProfile(); banner('The final mission', 'Build antimatter fuel and fly to another galaxy! Mine special minerals on different worlds and forge them into parts. Open your book (B), Final mission page, to see each step.'); }
+    const st = finalSteps(), n = st.filter(x => x.done).length; head = `Final mission ${n + 1} of ${st.length}`; txt = finalLine().replace(/^Step \d+ of \d+: /, ''); }
+  else { head = `Mission: wave ${wavesOn(look.planet.id) + 1} of ${LAST_WAVE}`; txt = nextTip().split(/(?<=[.!?])\s/)[0]; }
   el.classList.remove('hide');
   el.innerHTML = `<b>${head}</b><span>${says(txt)}</span>`;
 }
@@ -2264,13 +2323,13 @@ function updateLooks(dt) {
   const marsy = id === 'mars' && !race.active;
   const day = adv.daylight ?? 1, storm = !!(state.storm && state.storm.on);
   daySky.update(camera.position, adv.sunDir, day, marsy);
-  farHills.update(camera.position, scene.fog.color, !race.active && ['mars', 'proxima', 'trappist1e', 'lhs1140b'].includes(id));
+  farHills.update(camera.position, scene.fog.color, !race.active && ['mars', 'proxima', 'trappist1e', 'lhs1140b', 'tide', 'ring', 'glass'].includes(id));
   devils.update(dt, player.pos, (x, z) => world.surfaceY(x, z), marsy && !storm && playing ? Math.max(0, day * 1.4 - 0.4) : 0);
   // floating bits, shooting stars, ground haze, colour grade, lamp and ship lights
   const moteKind = race.active ? null : id === 'mars' ? 'dust' : id === 'proxima' ? 'ember' : id === 'moon' ? null : 'ice';
   motes.update(dt, camera.position, moteKind, id === 'mars' ? (storm ? 0.2 : 0.4 + 0.6 * day) : 0.4 + 0.6 * (1 - day));
   shooting.update(dt, camera.position, !race.active && day < 0.3 && look.sky.stars > 0.3 && !storm);
-  hazeU.uHaze.value = race.active ? 0 : ({ mars: 0.5, europa: 0.25, proxima: 0.4, trappist1e: 0.45, lhs1140b: 0.4, moon: 0 }[id] ?? 0) * (storm ? 1.4 : 1);
+  hazeU.uHaze.value = race.active ? 0 : ({ mars: 0.5, europa: 0.25, proxima: 0.4, trappist1e: 0.45, lhs1140b: 0.4, moon: 0, glass: 0.35, tide: 0.4, ring: 0.45 }[id] ?? 0) * (storm ? 1.4 : 1);
   hazeU.uHazeTop.value = look.terrain.sea ? look.terrain.sea + 4 : 29;
   { const n = 1 - day, sk = adv.sunDir.y > -0.1 && adv.sunDir.y < 0.2 ? 1 - Math.abs(adv.sunDir.y - 0.05) / 0.15 : 0;
     grade.uniforms.uTint.value.set(1.02 - 0.12 * n + 0.06 * Math.max(0, sk), 1.0 - 0.05 * n, 0.98 + 0.12 * n - 0.06 * Math.max(0, sk));
@@ -2456,7 +2515,7 @@ function updateGuide(dt, ev) {
   }
 }
 // ---- music: each world has its own feel
-const MOODS = { mars: 'warm', moon: 'calm', europa: 'ice', proxima: 'warm', trappist1e: 'calm', lhs1140b: 'dark', camp: 'calm', race: 'race' };
+const MOODS = { mars: 'warm', moon: 'calm', europa: 'ice', proxima: 'warm', trappist1e: 'calm', lhs1140b: 'dark', glass: 'ice', tide: 'calm', ring: 'warm', camp: 'calm', race: 'race' };
 let moodNow = null;
 function playMusic(where) { applySettings(); const m = MOODS[where] || 'calm'; if (m === moodNow) { startMusic(); return; } moodNow = m; setMood(m); restartMusic(); }
 // ---- settings
@@ -2521,5 +2580,5 @@ window.__game = {
   start: () => { playing = true; $('hud').classList.remove('hide'); $('touch').classList.add('on'); for (const p of panels) $(p).classList.add('hide'); renderHotbar(); renderGoal(); },
   pending: () => updateChunks(50), landOn, get look() { return look; },
   hit: () => hit, mouse, keys, tch, TOUCH, dig, useAction, renderGoal, get launchT() { return launchT; },
-  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, frame, stepNow, findNear, canMake, RECIPES, ITEMS, PARTS, nearShip, SHIP_CENTER, SHIP_BASE, get playing() { return playing; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; }, get treasures() { return treasures; }, sparkle, get digPh() { return digPh; },
+  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, frame, stepNow, findNear, canMake, RECIPES, ITEMS, PARTS, nearShip, SHIP_CENTER, SHIP_BASE, get playing() { return playing; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; }, get treasures() { return treasures; }, sparkle, get digPh() { return digPh; }, renderForge, renderMap, finalSteps,
 };

@@ -52,7 +52,40 @@ export function buildSky(scene, sky, sunDir, planet) {
   }
   const ball = (r, map, color = 0xffffff, glow = 0) => new THREE.Mesh(new THREE.SphereGeometry(r, 32, 24), new THREE.MeshLambertMaterial({ map, color, fog: false, emissive: color, emissiveMap: glow ? map : null, emissiveIntensity: glow }));
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  // a spiral galaxy drawn on a canvas: our Milky Way seen from Andromeda, or Andromeda seen from home
+  const galaxyTex = (warm) => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 256; const x = cv.getContext('2d');
+    const gr = x.createRadialGradient(128, 128, 0, 128, 128, 128); gr.addColorStop(0, warm ? 'rgba(255,240,210,1)' : 'rgba(255,248,230,1)'); gr.addColorStop(0.12, 'rgba(255,220,170,0.7)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = gr; x.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 2600; i++) {
+      const arm = i % 2, t = Math.pow(rnd(), 0.7) * 3.2, a = t * 1.7 + arm * Math.PI + (rnd() - 0.5) * 0.5, r = 10 + t * 34 + (rnd() - 0.5) * 10;
+      const px = 128 + Math.cos(a) * r, py = 128 + Math.sin(a) * r;
+      x.fillStyle = rnd() > 0.7 ? `rgba(170,200,255,${0.25 + rnd() * 0.4})` : `rgba(255,230,200,${0.15 + rnd() * 0.3})`;
+      x.fillRect(px, py, 1 + (rnd() > 0.9 ? 1 : 0), 1);
+    }
+    return new THREE.CanvasTexture(cv);
+  };
   for (const b of sky.bodies) {
+    if (b === 'milkyway') {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: galaxyTex(true), fog: false, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.85, rotation: 0.6 }));
+      sp.scale.set(300, 120, 1); sp.position.copy(at(V(0.45, 0.55, -0.7))); g.add(sp);
+    }
+    if (b === 'andromeda') {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: galaxyTex(false), fog: false, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.35, rotation: -0.5 }));
+      sp.scale.set(60, 22, 1); sp.position.copy(at(V(-0.3, 0.75, 0.55))); g.add(sp);
+    }
+    if (b === 'ring') {
+      // a huge flat ring of ice and rock round the planet, seen edge-on as a band across the sky
+      const cv = document.createElement('canvas'); cv.width = 512; cv.height = 4; const x = cv.getContext('2d');
+      for (let i = 0; i < 512; i++) { const v = 0.4 + 0.6 * Math.abs(Math.sin(i * 0.05) * Math.sin(i * 0.013 + 1)); const gap = (i > 300 && i < 318) || (i > 140 && i < 146); x.fillStyle = gap ? 'rgba(0,0,0,0)' : `rgba(${230 * v | 0},${210 * v | 0},${180 * v | 0},${0.55 + 0.4 * v})`; x.fillRect(i, 0, 1, 4); }
+      const tex = new THREE.CanvasTexture(cv);
+      const geo = new THREE.RingGeometry(520, 820, 128, 1);
+      const pos = geo.attributes.position, uv = geo.attributes.uv;
+      for (let i = 0; i < pos.count; i++) { const r = Math.hypot(pos.getX(i), pos.getY(i)); uv.setXY(i, (r - 520) / 300, 0.5); }
+      const ring = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, fog: false, depthWrite: false }));
+      ring.rotation.set(-1.25, 0.35, 0); ring.position.set(0, -420, 0); ring.renderOrder = -7; g.add(ring);
+    }
+
     if (b === 'marsMoons') {
       const moon = new THREE.Mesh(lumpy(30), new THREE.MeshLambertMaterial({ map: moonTex(), fog: false }));
       moon.position.set(300, 190, -260); moon.scale.set(1.3, 1, 1.1); moon.rotation.set(0.4, 0.8, 0.2);

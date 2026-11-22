@@ -7,18 +7,20 @@ export const STARS = {
   proxima: { name: 'Proxima Centauri', ra: 14.5, ly: 4.24, worlds: ['proxima'] },
   trappist: { name: 'TRAPPIST-1', ra: 23.1, ly: 40.7, worlds: ['trappist1e'] },
   lhs: { name: 'LHS 1140', ra: 0.75, ly: 48.8, worlds: ['lhs1140b'] },
+  andromeda: { name: 'Andromeda galaxy', ra: 0.71, ly: 2500000, galaxy: true, worlds: ['glass', 'tide', 'ring'] },
 };
 export const starOf = (w) => Object.keys(STARS).find(k => STARS[k].worlds.includes(w));
 
 // engine needed: 1 = our Solar System, 2 = the nearest star, 3 = the far stars
-export const ENGINE_NEED = { mars: 1, moon: 1, europa: 1, proxima: 2, trappist1e: 3, lhs1140b: 3 };
-export const ENGINE_NAMES = ['', 'Repaired engine', 'Strong engine', 'Star engine'];
+export const ENGINE_NEED = { mars: 1, moon: 1, europa: 1, proxima: 2, trappist1e: 3, lhs1140b: 3, glass: 4, tide: 4, ring: 4 };
+export const ENGINE_NAMES = ['', 'Repaired engine', 'Strong engine', 'Star engine', 'Galaxy drive'];
 export const TANK_SIZE = [0, 3, 6];
 
 // fuel cells for a trip
 export function fuelFor(from, to) {
   if (from === to) return 0;
   const a = starOf(from), b = starOf(to);
+  if (a === 'andromeda' || b === 'andromeda') return a === b ? 2 : 6;
   if (a === b) return (from === 'europa' || to === 'europa') ? 2 : 1;
   if (b === 'proxima' || a === 'proxima' && b === 'sun') return 3;
   return 5;
@@ -28,6 +30,7 @@ export const UPGRADES = [
   { id: 'tank', level: 2, name: 'Bigger fuel tank', need: { sheet: 6, crystal: 3, gold: 2 }, note: 'Holds 6 fuel cells instead of 3. Needed for the far stars.' },
   { id: 'engine', level: 2, name: 'Strong engine', need: { scale: 1, sheet: 6, crystal: 4 }, note: 'Reaches Proxima Centauri, the nearest star. Needs a Dragon scale.' },
   { id: 'engine', level: 3, name: 'Star engine', need: { scale: 2, gold: 4, gem: 2 }, note: 'Reaches TRAPPIST-1 and LHS 1140, 40 to 50 light years away. Needs 2 Dragon scales.' },
+  { id: 'engine', level: 4, name: 'Galaxy drive', need: { antimatter: 2, scale: 1, sheet: 10 }, note: 'The final mission. Burns antimatter to cross 2.5 million light years to the Andromeda galaxy. Needs the Bigger fuel tank too.' },
 ];
 
 // can you fly from `from` to `to` right now? returns { ok, why }

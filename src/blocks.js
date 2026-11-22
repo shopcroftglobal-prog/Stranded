@@ -168,6 +168,14 @@ export const FORGE_RECIPES = [
   { out: 'gshield', need: { gold: 4, sheet: 2 }, note: 'Blocks half of every hit.' },
   { out: 'blade', need: { gem: 3, gold: 2, crystal: 3 }, note: 'Level 5. The only thing that can beat a dragon.' },
   { out: 'sshield', need: { gem: 2, gold: 3, sheet: 3 }, note: 'Blocks 60% of every hit.' },
+  // the final mission: antimatter, made from things found on every world
+  { out: 'magnet', need: { iron: 12, yellowstone: 3 }, note: 'Mars. Antimatter must never touch anything, so it is held in the air by strong magnets.', final: true },
+  { out: 'lens', need: { glass: 6, sand: 8 }, note: 'The Moon and TRAPPIST-1e. Focuses the light that makes antimatter.', final: true },
+  { out: 'coldcore', need: { salt: 6, ice: 12 }, note: 'Europa. Antimatter traps must be kept colder than anything in nature.', final: true },
+  { out: 'heatshield', need: { blackrock: 8, gold: 4 }, note: 'Proxima b and LHS 1140 b. Antimatter gives off huge heat when it is used.', final: true },
+  { out: 'powercrystal', need: { crystal: 6, gem: 2 }, note: 'Any world. Stores the power to make antimatter.', final: true },
+  { out: 'trap', need: { magnet: 1, coldcore: 1, lens: 1, heatshield: 1 }, note: 'A real idea: scientists at CERN keep antimatter in magnet traps like this.', final: true },
+  { out: 'antimatter', need: { trap: 1, powercrystal: 1, scale: 1 }, note: 'The strongest fuel there is. The Galaxy drive needs 2.', final: true },
   // unique gear: only from what mining rigs dig up
   { out: 'embersword', need: { ember: 3, shard: 2 }, note: 'Unique. Hits 26. Made only from rig finds.', legend: true },
   { out: 'moonhammer', need: { pearl: 3, shard: 2, gold: 2 }, note: 'Unique. Hits 30 and knocks down every creature near the one you hit.', legend: true },
@@ -238,6 +246,10 @@ for (const f of FAMILIES) {
 // Fixed ids (above the colourful blocks) so saved worlds keep working.
 Object.assign(B, { DARKSAND: 120, TANROCK: 121, PALECLAY: 122, PURPLEROCK: 123, BLACKROCK: 124, FROST: 125, YELLOWSTONE: 126, GREENSTONE: 127 });
 Object.assign(B, { TRACKS: 128, SAND: 129 });
+Object.assign(ITEMS, {
+  magnet: { name: 'Magnet ring' }, lens: { name: 'Focus lens' }, coldcore: { name: 'Cold core' }, heatshield: { name: 'Heat shield' },
+  powercrystal: { name: 'Power crystal' }, trap: { name: 'Antimatter trap' }, antimatter: { name: 'Antimatter cell', rare: true },
+});
 def(B.TRACKS, { name: 'Red dirt', item: 'reddirt', tiles: { top: 'tracks', side: 'redSide', bottom: 'dust' }, time: 0.45 });
 def(B.SAND, { name: 'Sand', item: 'sand', tiles: 'sand', time: 0.5 });
 ITEMS.sand = { name: 'Sand', block: B.SAND };

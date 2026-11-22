@@ -46,6 +46,9 @@ const SKIN = {
   proxima: { a: '#4a1418', b: '#7a2a2a', eye: '#ffb040' },
   trappist1e: { a: '#1e4a4a', b: '#3a7a6a', eye: '#ffe060' },
   lhs1140b: { a: '#5a5a5e', b: '#8a8680', eye: '#ff6a3a' },
+  glass: { a: '#3a4a8a', b: '#a8b0d8', eye: '#c8a0ff' },
+  tide: { a: '#2a6a8a', b: '#d8e8f0', eye: '#ffe060' },
+  ring: { a: '#8a6418', b: '#e8c878', eye: '#ff4a2a' },
 };
 const skinOf = (w) => SKIN[w] || SKIN.mars;
 

@@ -98,6 +98,47 @@ export const PLANETS = [
       { ore: 'crystal', why: 'Purple crystal.' },
     ],
   },
+  // ---- the Andromeda galaxy. In 1999 astronomers saw a hint of a planet there (PA-99-N2 b), but nobody
+  // knows any of its worlds, so these three are made up. Their numbers are only for the game.
+  {
+    id: 'glass', name: 'Glass world', galaxy: 'andromeda', madeUp: true,
+    blurb: 'A made-up world in the Andromeda galaxy. Blue plains full of crystal under a blue-white sun.',
+    real: {
+      gravity: 0.7, gravityGuess: true, radius: 0.85, density: 4.4, tempC: -30, air: 'thin',
+      star: { name: 'a blue-white star', teff: 9200, radius: 1.8 }, orbitAU: 4.5, lightYears: 2500000,
+      distanceText: 'In the Andromeda galaxy, 2.5 million light years from Earth',
+      yearText: 'Made up for the game: nobody has seen a world in another galaxy yet.',
+    },
+    surface: { top: 'Blue dust', under: 'Dust' },
+    sky: 'Our own galaxy, the Milky Way, hangs in the sky as a glowing spiral. Home is somewhere in there.',
+    rare: [{ ore: 'crystal', why: 'Purple crystal everywhere.' }, { ore: 'gold', why: 'Gold, deep down.' }],
+  },
+  {
+    id: 'tide', name: 'Blue world', galaxy: 'andromeda', madeUp: true,
+    blurb: 'A made-up ocean world in Andromeda. Warm blue seas, white beaches and tall cliffs.',
+    real: {
+      gravity: 1.05, gravityGuess: true, radius: 1.1, density: 5.2, tempC: 8, air: 'thick', water: true,
+      star: { name: 'a white star', teff: 6400, radius: 1.2 }, orbitAU: 1.4, lightYears: 2500000,
+      distanceText: 'In the Andromeda galaxy, 2.5 million light years from Earth',
+      yearText: 'Made up for the game: nobody has seen a world in another galaxy yet.',
+    },
+    surface: { top: 'White sand', under: 'Sand' },
+    sky: 'Our Milky Way, a glowing spiral, and a pale blue sky.',
+    rare: [{ ore: 'crystal', why: 'Purple crystal under the sea floor.' }, { ore: 'gold', why: 'Gold, deep down.' }],
+  },
+  {
+    id: 'ring', name: 'Ring world', galaxy: 'andromeda', madeUp: true,
+    blurb: 'A made-up desert world in Andromeda with a huge ring of ice and rock across its sky.',
+    real: {
+      gravity: 0.55, gravityGuess: true, radius: 0.8, density: 5.6, tempC: -10, air: 'thin',
+      star: { name: 'an orange star', teff: 4700, radius: 0.8 }, orbitAU: 0.7, lightYears: 2500000,
+      distanceText: 'In the Andromeda galaxy, 2.5 million light years from Earth',
+      yearText: 'Made up for the game: nobody has seen a world in another galaxy yet.',
+    },
+    surface: { top: 'Gold sand', under: 'Sand' },
+    sky: 'A giant ring arches across the whole sky, and the Milky Way glows beside it.',
+    rare: [{ ore: 'gold', why: 'Gold is common here.' }, { ore: 'crystal', why: 'Purple crystal.' }],
+  },
 ];
 
 export const planetById = (id) => PLANETS.find(p => p.id === id) || PLANETS[0];
@@ -129,6 +170,7 @@ export function tempWords(p) {
   const r = p.real;
   if (r.tempText) return r.tempText;
   const t = r.tempC;
+  if (t > 0) return `About ${t} °C: cool, like a spring day`;
   const c = t < -90 ? 'colder than anywhere on Earth' : t < -55 ? 'like the coldest Antarctic winter' : t < -35 ? 'like winter in Antarctica' : 'like a bitter winter night';
   return `About ${t} °C: ${c}`;
 }
@@ -136,6 +178,7 @@ export function tempWords(p) {
 export function starWords(p) {
   const s = p.real.star;
   if (s.name === 'the Sun') return p.real.orbitAU > 2 ? 'Our Sun, but small and far away' : 'Our Sun';
+  if (p.madeUp) return s.name[0].toUpperCase() + s.name.slice(1) + (s.radius > 1 ? ', bigger and hotter than our Sun' : s.radius < 1 ? ', a bit smaller and cooler than our Sun' : ', much like our Sun');
   const smaller = Math.round(1 / s.radius);
   return `${s.name}, a small red star ${smaller} times smaller than our Sun`;
 }

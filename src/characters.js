@@ -82,6 +82,7 @@ export const SUITS = {
   deepsea: { name: 'Deep sea', suit: '#1e6a72', trim: '#9af0e0', dark: '#123a40', glass: '#081418', pattern: 'scales', alt: '#175a60' },
   snow: { name: 'Snow', suit: '#f4f6f8', trim: '#3a8ad8', dark: '#5a6a7a', glass: '#142034', pattern: 'spots', alt: '#d8e2ea' },
   gold: { name: 'Gold', suit: '#e8b830', trim: '#fff4b0', dark: '#6a4a10', glass: '#1a1408', pattern: 'gold' },
+  star: { name: 'Star traveller', suit: '#2a3060', trim: '#e8b830', dark: '#141830', glass: '#0a0c18', pattern: 'stars' },
   dragon: { name: 'Dragon scale', suit: '#4a2a5a', trim: '#e8c547', dark: '#22122a', glass: '#100814', pattern: 'scales', alt: '#3a2048' },
 };
 // paints the suit cloth with the skin's pattern. Returns a colour or [colour, glow].
@@ -461,6 +462,9 @@ Object.assign(COLOURS, {
     proxima:    { name: 'Red sun dragon', world: 'Proxima b', body: '#3a1418', crack: '#ff4a2a', belly: '#7a3030', horn: '#ffb080', horns: 'crest', wings: 'wide', cracks: 1.3, note: 'Proxima b. Glows brighter when the red star flares, with a crest like sun rays.' },
     trappist1e: { name: 'Sea dragon', world: 'TRAPPIST-1e', body: '#1e4a4a', crack: '#40e0b0', belly: '#a0c8b0', horn: '#d0e8d8', wings: 'fins', back: 'fin', tail: 'long', neck: 26, neckTilt: 0.35, cracks: 0.4, stripes: true, note: 'TRAPPIST-1e. Rises out of the frozen sea. Fins instead of wings and a long swimming tail.' },
     lhs1140b:   { name: 'Stone dragon', world: 'LHS 1140 b', body: '#5a5a5e', crack: '#ffd060', belly: '#9a968e', horn: '#e8e2d4', horns: 'big', wings: 'none', legW: 13, bodyW: 34, neck: 12, neckTilt: 0.3, tail: 'club', back: 'plates', cracks: 0.25, note: 'LHS 1140 b. Gravity is so strong it cannot fly. Slow and very heavy, with a club tail.' },
+    glass:      { name: 'Crystal dragon', world: 'Glass world', body: '#2a3a7a', crack: '#b8a0ff', belly: '#a8b0d8', horn: '#e0d8ff', horns: 'ice', wings: 'wide', cracks: 1.0, back: 'plates', note: 'Glass world. Made of blue stone with glowing crystal cracks.' },
+    tide:       { name: 'Wave dragon', world: 'Blue world', body: '#1e5a8a', crack: '#7af0ff', belly: '#e0f0f4', horn: '#f0f8ff', wings: 'fins', back: 'fin', tail: 'long', neck: 26, neckTilt: 0.35, cracks: 0.5, stripes: true, note: 'Blue world. Swims up out of the warm sea.' },
+    ring:       { name: 'Gold dragon', world: 'Ring world', body: '#8a6418', crack: '#fff0a0', belly: '#e8c878', horn: '#fff4d0', horns: 'crest', wings: 'wide', cracks: 0.7, note: 'Ring world. Shines like gold and flies down from the sky ring.' },
   },
 
 });

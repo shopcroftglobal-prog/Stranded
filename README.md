@@ -214,3 +214,14 @@ Each new place is based on a real place on Mars:
 - Floating dust on Mars, ice glitter on cold worlds, embers on Proxima b, shooting stars on clear nights.
 - Far mountains on the horizon on every world with air.
 - Screenshots: screenshots/visuals-v25/. Test: test/visuals.js.
+
+## Version 26: the final mission, to another galaxy
+- New end goal: build antimatter fuel and fly to the Andromeda galaxy. After 10 waves on a world the mission line starts showing the next step (it takes turns with the wave line), and the book (B) has a "Final mission" page with all 9 steps.
+- Mine special minerals on different worlds and forge them (Forge, new section at the bottom):
+  Magnet ring (iron + yellow stone, Mars), Focus lens (glass + sand, Moon / TRAPPIST-1e), Cold core (salt + ice, Europa), Heat shield (black rock + gold, Proxima b / LHS 1140 b), Power crystal (purple crystal + Gems).
+  The four parts make an Antimatter trap (real idea: CERN holds antimatter in magnet traps). Trap + power crystal + dragon scale = 1 Antimatter cell.
+- 2 Antimatter cells + 1 dragon scale + 10 metal sheets fit the Galaxy drive (star map, M). Then fly 2.5 million light years to Andromeda (6 fuel cells; 2 between its worlds).
+- Three new made-up worlds there, each with its own colours, sky, 50 waves and a dragon at wave 50:
+  Glass world (blue-white star, blue crystal ground, Crystal dragon), Blue world (warm ocean world with beaches, Wave dragon), Ring world (desert under a giant ring, Gold dragon). From there the Milky Way hangs in the sky.
+- Arriving the first time: big celebration, +3000 coins and the Star traveller suit. Mars nights now show a faint Andromeda in the sky.
+- Test: test/final.js (forges every part, fits the drive, flies to all three new worlds).
