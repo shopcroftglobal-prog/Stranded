@@ -7,18 +7,19 @@
 // Everything here is optional: with no room or db (opened outside claude.ai), the camp
 // still works as a world of your own.
 import * as THREE from 'three';
-import { makePilot, animate } from './characters.js';
+import { makePilot, animate , SUITS as SUIT_LIST } from './characters.js';
 import { CS } from './world.js';
 
 export const PHRASES = ['Hello!', 'Come here!', 'Look at this!', 'Nice build!', 'Thank you!', 'Follow me!', "Let's race!", 'Bye!'];
-const SUITS = ['sand', 'sea', 'sun', 'berry', 'frost'];
+const SUITS = Object.keys(SUIT_LIST);
+const RANDOM_SUITS = ['sand', 'sea', 'sun', 'berry', 'frost'];
 
 export function createFriends(ctx) {
   let room = null, user = null, db = null, tried = false;
   let campRoom = null, campOn = false;
   const others = new Map();          // peer -> { m, tag, bubble, pos, ... }
   const names = {};
-  const rndSuit = SUITS[Math.floor(Math.random() * SUITS.length)];
+  const rndSuit = RANDOM_SUITS[Math.floor(Math.random() * RANDOM_SUITS.length)];
   const mySuitNow = () => (ctx.suit && ctx.suit()) || rndSuit;
   let say = null, sayT = 0, lastSend = 0;
   const chatLog = [];

@@ -3,13 +3,17 @@ import * as rigsMod from './rigs.js';
 import { createRace } from './race.js';
 import { createFriends, PHRASES } from './friends.js';
 import { makeRover, makePilot, animate, SUITS } from './characters.js';
-const LOOKS = { suit: { sand: 0, sea: 100, sun: 100, berry: 250, frost: 250 }, rover: { sun: 0, sea: 150, berry: 150 } };
+const LOOKS = { suit: { sand: 0, sea: 100, sun: 100, berry: 250, frost: 250, lime: 300, rust: 400, racing: 500,
+  night: { gems: 3 }, glowline: { gems: 4 }, lava: { gems: 5 },
+  redplanet: { set: 'mars' }, moondust: { set: 'moon' }, icecrystal: { set: 'europa' }, redsun: { set: 'proxima' }, deepsea: { set: 'trappist1e' }, snow: { set: 'lhs1140b' },
+  gold: { all: true }, dragon: { dragon: true } }, rover: { sun: 0, sea: 150, berry: 150 } };
 import { createPets, caughtPets, PET_GIFTS } from './pets.js';
 import { createHooks } from './hooks.js';
 import { createQuests, dailyQuests, questText, questCoins, BADGES } from './quests.js';
 import { HOME_R, LEVELS, COSY_LIST, comfort, levelOf, atHome, giftReady, claimGift, updateGardens, growTime } from './home.js';
 import { World, CS, H, meshChunk, meshVolume } from './world.js';
 import { hash3 } from './noise.js';
+import { TREASURES, TREASURE_BY_ID, ALL_COUNT, treasureIcon, createTreasures } from './treasures.js';
 import { FAMILY_ITEMS, BUILD_COST, BUILD_RECIPES, recipeFor } from './blocks.js';
 import { COLOUR, FAMILIES } from './colours.js';
 import { PLANS, planBlocks } from './plans.js';
@@ -122,7 +126,7 @@ const freshState = () => ({
 });
 let state = freshState();
 let team = null;   // { code, world } when playing a world together
-let inCamp = false, friends = null, quests = null, pets = null, hooks = null;
+let inCamp = false, friends = null, quests = null, pets = null, hooks = null, treasures = null;
 let world, player;
 let playing = false, paused = false;
 let shipMesh = null, launchT = -1;
@@ -156,6 +160,7 @@ function applyLook(id) {
   if (lavaSea) lavaSea.setLevel(look.terrain.lava ? look.terrain.sea + 0.75 : null);
   if (prints) prints.clear();
   if (plumes) plumes.reset();
+  if (typeof sparkle !== 'undefined') { sparkle.on = false; sparkle.g.visible = false; sparkle.wait = 25; }
   if (water) water.setLevel(look.terrain.liquid && !look.terrain.lava ? look.terrain.sea + 0.9 : null, look.planet.id === 'lhs1140b' ? 0x2f6688 : 0x23889a);
   sun.color.set(k.sun); sun.intensity = k.sunI;
   hemi.color.set(k.hemi[0]); hemi.groundColor.set(k.hemi[1]); hemi.intensity = k.hemi[2];
@@ -600,7 +605,7 @@ const G = {
   godMode: params.has('god'), easy: params.has('easy'),
   banner, showFall, waveReward,
   calm: () => profile.free || inCamp,
-  track: (ev, n) => { if (quests) quests.track(ev, n); if (hooks) hooks.addXP(ev, n); },
+  track: (ev, n) => { if (quests) quests.track(ev, n); if (hooks) hooks.addXP(ev, n); if (ev === 'dragon') unlockSuit('dragon', 'You beat a dragon!'); },
   home: () => ({ at: !!state.flag && atHome(state, player.pos), lv: homeLv, flag: state.flag, inside: (x, z) => !!state.flag && Math.abs(x - state.flag.x - 0.5) <= HOME_R + 0.5 && Math.abs(z - state.flag.z - 0.5) <= HOME_R + 0.5 }),
 };
 let homeLv = 0;
@@ -611,7 +616,7 @@ function banner(title, sub) {
   const b = $('banner');
   b.innerHTML = `<div class="bt">${title}</div><div class="bs">${sub || ''}</div>`;
   b.classList.remove('hide'); b.style.animation = 'none'; void b.offsetWidth; b.style.animation = '';
-  clearTimeout(banner.t); banner.t = setTimeout(() => b.classList.add('hide'), 3600);
+  clearTimeout(banner.t); banner.t = setTimeout(() => b.classList.add('hide'), Math.min(7000, 3600 + (sub || '').length * 25));
 }
 function showFall(msg, lost) {
   $('fallMsg').textContent = msg;
@@ -1037,13 +1042,29 @@ function updateHome(dt) {
   quests.check(state);
 }
 
+// ---- small pictures of each suit, drawn once
+const suitThumbs = {};
+let thumbR = null;
+function suitThumb(k) {
+  if (suitThumbs[k]) return suitThumbs[k];
+  try {
+    if (!thumbR) { thumbR = new THREE.WebGLRenderer({ alpha: true, antialias: false, preserveDrawingBuffer: true }); thumbR.setSize(72, 90); thumbR.outputColorSpace = THREE.SRGBColorSpace; }
+    const sc = new THREE.Scene(); sc.add(new THREE.AmbientLight(0xffffff, 1.6)); const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(1, 2, 2); sc.add(dl);
+    const m = makePilot(k); m.rotation.y = 0.5; sc.add(m);
+    const cam = new THREE.PerspectiveCamera(30, 72 / 90, 0.1, 20); cam.position.set(0, 1.15, 3.4); cam.lookAt(0, 1.0, 0);
+    thumbR.render(sc, cam);
+    suitThumbs[k] = thumbR.domElement.toDataURL();
+    m.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  } catch (e) { suitThumbs[k] = ''; }
+  return suitThumbs[k];
+}
 // ---- Collection book
 let bookWorld = null;
 function renderBook() {
   const ids = WORLD_ORDER.filter(id => profile.visited[id]);
   if (!bookWorld || (!ids.includes(bookWorld) && bookWorld[0] !== '_')) bookWorld = '_quests';
   const dq = dailyQuests(), ready = dq.quests.filter(q => q.have >= q.need && !q.claimed).length;
-  $('bookTabs').innerHTML = [['_quests', `Daily quests${ready ? ` (${ready}!)` : ''}`], ['_badges', 'Badges'], ['_shop', 'Shop'], ['_pets', 'Pets'], ['_looks', 'Looks'], ...ids.map(id => [id, planetById(id).name])]
+  $('bookTabs').innerHTML = [['_quests', `Daily quests${ready ? ` (${ready}!)` : ''}`], ['_badges', 'Badges'], ['_shop', 'Shop'], ['_pets', 'Pets'], ['_looks', 'Looks'], ['_treasures', `Treasures (${treasures ? treasures.total() : 0}/${ALL_COUNT})`], ...ids.map(id => [id, planetById(id).name])]
     .map(([id, n]) => `<button class="${id === bookWorld ? 'on' : ''}" data-w="${id}">${n}</button>`).join('');
   $('bookTabs').querySelectorAll('button').forEach(b => b.onclick = () => { bookWorld = b.dataset.w; renderBook(); });
   if (bookWorld === '_quests') {
@@ -1089,26 +1110,46 @@ function renderBook() {
   }
   if (bookWorld === '_looks') {
     profile.owned = profile.owned || {};
-    $('bookSum').textContent = `Pick how you look. Others see your suit in the Friends' camp. Press Y to switch between seeing your pilot and looking through your eyes. You have ${profile.coins} coins.`;
+    const gems = has('gem');
+    $('bookSum').textContent = `Pick how you look. Others see your suit in the Friends' camp and in races. Press Y to switch between seeing your pilot and looking through your eyes. You have ${profile.coins} coins and ${gems} Gems.`;
     $('bookList').innerHTML = '';
+    const how = (c) => typeof c === 'number' ? `${c} coins` : c.gems ? `${c.gems} Gems` : c.set ? `Find all treasures on ${planetById(c.set).name}` : c.all ? 'Find every treasure on every world' : 'Beat a dragon';
     const rows = [
       ...Object.entries(LOOKS.suit).map(([k, c]) => ['suit', k, `${SUITS[k].name} suit`, c]),
       ...(profile.rover ? Object.entries(LOOKS.rover).map(([k, c]) => ['rover', k, `${{ sun: 'Sun', sea: 'Sea', berry: 'Berry' }[k]} Rover`, c]) : []),
     ];
     for (const [kind, k, name, cost] of rows) {
       const key = kind + '_' + k, own = cost === 0 || profile.owned[key];
+      const buyable = typeof cost === 'number' || cost.gems;
+      const can = typeof cost === 'number' ? profile.coins >= cost : cost.gems ? gems >= cost.gems : false;
       const on = kind === 'suit' ? (profile.suit || 'sand') === k : (profile.roverLook || 'sun') === k;
-      const row = document.createElement('div'); row.className = 'quest' + (on ? ' done' : '');
-      row.innerHTML = `<div>${name} <small class="sub">${on ? 'Wearing it' : own ? 'Yours' : cost + ' coins'}</small></div><div><i class="swatch" style="background:${kind === 'suit' ? SUITS[k].suit : { sun: '#e8b23c', sea: '#4e9690', berry: '#8a3a6e' }[k]}"></i></div>`;
+      const row = document.createElement('div'); row.className = 'quest look' + (on ? ' done' : '') + (!own && !buyable ? ' locked' : '');
+      const pic = kind === 'suit' ? `<img class="suitpic" src="${suitThumb(k)}" alt="">` : `<i class="swatch" style="background:${{ sun: '#e8b23c', sea: '#4e9690', berry: '#8a3a6e' }[k]}"></i>`;
+      const tag = kind === 'suit' && typeof cost === 'object' ? (cost.gems ? '<span class="rar rare">Rare</span>' : '<span class="rar epic">Reward</span>') : '';
+      row.innerHTML = `${pic}<div>${name} ${tag}<br><small class="sub">${on ? 'Wearing it' : own ? 'Yours' : how(cost)}</small></div>`;
       const btn = document.createElement('button');
-      btn.textContent = on ? 'On' : own ? 'Use' : 'Buy';
-      btn.disabled = on || (!own && profile.coins < cost);
+      btn.textContent = on ? 'On' : own ? 'Use' : buyable ? 'Buy' : 'Locked';
+      btn.disabled = on || (!own && !can);
       btn.onclick = () => {
-        if (!own) { profile.coins -= cost; profile.owned[key] = 1; sfx.coin(); renderStatus(); }
+        if (!own) { if (typeof cost === 'number') profile.coins -= cost; else take('gem', cost.gems); profile.owned[key] = 1; sfx.coin(); renderStatus(); renderHotbar(); }
         if (kind === 'suit') profile.suit = k; else profile.roverLook = k;
         saveProfile(); toast(`${name} on!`); renderBook();
       };
       row.appendChild(btn); $('bookList').appendChild(row);
+    }
+    return;
+  }
+  if (bookWorld === '_treasures') {
+    $('bookSum').textContent = `You have found ${treasures.total()} of ${ALL_COUNT} treasures. Dig, open old supply boxes, and walk to sparkles on the ground. Find a whole world's set to win a suit.`;
+    $('bookList').innerHTML = '';
+    for (const w of WORLD_ORDER) {
+      const T = TREASURES[w]; if (!T) continue;
+      const been = profile.visited[w], n = treasures.count(w);
+      const sec = document.createElement('div'); sec.className = 'tset';
+      const hint = (t) => t.where === 'dig' ? 'Hidden when you dig' : t.where === 'box' ? 'In an old supply box' : 'A sparkle on the ground';
+      sec.innerHTML = `<div class="thead"><b>${planetById(w).name}</b> <span>${n} of ${T.list.length}</span><span class="tprize"><img class="suitpic sm" src="${suitThumb(T.suit)}" alt="">${n === T.list.length ? 'Won: ' : 'Prize: '}${SUITS[T.suit].name} suit</span></div>`
+        + `<div class="tgrid">${T.list.map(t => { const got = treasures.have(t.id); return `<div class="titem${got ? ' got' : ''}" title="${got ? t.fact.replace(/"/g, '') : ''}"><img src="${treasureIcon(t.id, got)}" alt=""><div>${got ? t.name : '???'}</div><small>${got ? '' : been ? hint(t) : 'Visit to look'}</small></div>`; }).join('')}</div>`;
+      $('bookList').appendChild(sec);
     }
     return;
   }
@@ -1459,6 +1500,7 @@ function updateDig(dt) {
     }
     state.stats.mined++; G.track('mine');
     { const lk = hooks.dug(); if (lk) { toast(lk); sfx.coin(); bits.burst(hit.x, hit.y, hit.z, GOLDS); } }
+    if (!inCamp && treasures) treasures.dug(hit.id);
     dig.on = false; dig.p = 0; crackBox.visible = false;
     renderGoal();
   }
@@ -1475,6 +1517,7 @@ function openSupply() {
   sfx.catch(); setTimeout(() => sfx.coin(), 300);
   banner('Old supply box!', `+${coins} coins, ` + Object.entries(loot).map(([k, n]) => `${n} ${ITEMS[k].name}`).join(', ') + (first ? ' · new in your book' : ''));
   saveProfile();
+  if (!inCamp && treasures) setTimeout(() => treasures.box(), 2800);
 }
 function useAction() {
   if (launchT >= 0) return;
@@ -1968,6 +2011,22 @@ const GOLDS = [0xffd54a, 0xfff3a0, 0xffb347, 0xffffff].map(c => new THREE.Color(
 hooks = createHooks({ give: (k, n) => give(k, n, true), toast: (t) => toast(t), banner: (a, b) => banner(a, b), sfx, ITEMS, icon,
   burst: () => { if (!player) return; for (let k = 0; k < 3; k++) bits.burst(player.pos.x - 0.5 + (Math.random() - 0.5) * 2, player.pos.y + 0.8, player.pos.z - 0.5 + (Math.random() - 0.5) * 2, GOLDS); },
   onChange: () => { renderLevel(); } });
+// ---- treasures to collect, and suits you win for full sets
+function unlockSuit(k, why) {
+  profile.owned = profile.owned || {};
+  if (profile.owned['suit_' + k]) return;
+  profile.owned['suit_' + k] = 1; saveProfile();
+  setTimeout(() => { banner(`New suit: ${SUITS[k].name}!`, `${why} Wear it from the Looks page in your book (B).`); sfx.win(); }, 2600);
+}
+treasures = createTreasures({ get profile() { return profile; }, save: saveProfile, world: () => look.planet.id,
+  onFind: (t, n, of, setDone, allDone) => {
+    sfx.catch(); setTimeout(() => sfx.coin(), 250);
+    if (player) for (let k = 0; k < 4; k++) bits.burst(player.pos.x - 0.5 + (Math.random() - 0.5) * 2, player.pos.y + 0.8, player.pos.z - 0.5 + (Math.random() - 0.5) * 2, GOLDS);
+    profile.coins += 40; renderStatus(); G.track('treasure');
+    banner(`Treasure: ${t.name}!`, `${n} of ${of} on ${planetById(t.world).name}. +40 coins. ${t.fact}`);
+    if (setDone) unlockSuit(TREASURES[t.world].suit, `You found every treasure on ${planetById(t.world).name}.`);
+    if (allDone) unlockSuit('gold', 'You found every treasure on every world!');
+  } });
 let wasWaiting = null;
 setInterval(() => { if (!hooks || !playing) return; const w = hooks.waiting(); if (w && wasWaiting === false) toast(hooks.chestReady() ? 'A free chest is ready! Press R (Prizes) to open it.' : 'You have a free spin! Press R (Prizes).'); wasWaiting = w; renderLevel(); }, 20000);
 function renderLevel() {
@@ -2075,9 +2134,45 @@ function backToTop() {
 }
 $('upBtn').onclick = () => backToTop();
 if (TOUCH) $('upBtn').textContent = '⬆ Back to the top';
+// ---- a sparkle lying on the ground somewhere near you: walk to it to pick up a treasure
+const sparkle = (() => {
+  const g = new THREE.Group();
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), new THREE.MeshBasicMaterial({ color: 0xfff0a0 }));
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.35, 14, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xffe080, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  beam.position.y = 7; g.add(gem, beam); g.visible = false; scene.add(g);
+  return { g, gem, beam, on: false, t: 0, wait: 20 };
+})();
+function updateSparkle(dt) {
+  const S = sparkle;
+  const can = playing && !inCamp && !race.active && state.won !== undefined && treasures && launchT < 0;
+  if (!can) { S.g.visible = false; return; }
+  if (!S.on) {
+    S.wait -= dt;
+    if (S.wait > 0 || !treasures.groundLeft()) return;
+    const a = Math.random() * Math.PI * 2, r = 22 + Math.random() * 26;
+    const x = Math.floor(player.pos.x + Math.cos(a) * r), z = Math.floor(player.pos.z + Math.sin(a) * r);
+    if (Math.hypot(x - SHIP_CENTER.x, z - SHIP_CENTER.z) < 8) return;
+    const y = world.surfaceY(x, z);
+    if (look.terrain.sea && y < look.terrain.sea && look.terrain.liquid) return;
+    S.g.position.set(x + 0.5, y + 1, z + 0.5); S.on = true; S.t = 0; S.g.visible = true;
+    toast('Something is sparkling nearby. Look for the light!');
+    return;
+  }
+  S.t += dt;
+  S.gem.rotation.y += dt * 2; S.gem.position.y = 0.45 + Math.sin(S.t * 3) * 0.12;
+  S.beam.material.opacity = 0.25 + Math.sin(S.t * 4) * 0.1;
+  const d = Math.hypot(player.pos.x - S.g.position.x, player.pos.z - S.g.position.z);
+  if (d > 110) { S.on = false; S.g.visible = false; S.wait = 30; return; }
+  if (d < 1.6 && Math.abs(player.pos.y - S.g.position.y) < 2.5) {
+    S.on = false; S.g.visible = false; S.wait = 150 + Math.random() * 120;
+    bits.burst(S.g.position.x - 0.5, S.g.position.y, S.g.position.z - 0.5, GOLDS);
+    treasures.ground();
+  }
+}
 // ---- extra looks: sunsets, auroras, weather, footprints, lava
 function updateLooks(dt) {
   const id = look.planet.id;
+  updateSparkle(dt);
   const sk = sunset.update(camera.position, adv.sunDir, !inCamp || true);
   if (sk > 0.05) { scene.fog.color.set(fogBase).lerp(new THREE.Color(0xd8704a), sk * 0.35); } 
   // Mars: tan day sky with a blue sun glow, far mountains, dust devils on sunny days
@@ -2330,5 +2425,5 @@ window.__game = {
   start: () => { playing = true; $('hud').classList.remove('hide'); $('touch').classList.add('on'); for (const p of panels) $(p).classList.add('hide'); renderHotbar(); renderGoal(); },
   pending: () => updateChunks(50), landOn, get look() { return look; },
   hit: () => hit, mouse, keys, tch, TOUCH, dig, useAction, renderGoal, get launchT() { return launchT; },
-  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, frame, stepNow, findNear, canMake, RECIPES, ITEMS, PARTS, nearShip, SHIP_CENTER, SHIP_BASE, get playing() { return playing; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; }, get digPh() { return digPh; },
+  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, frame, stepNow, findNear, canMake, RECIPES, ITEMS, PARTS, nearShip, SHIP_CENTER, SHIP_BASE, get playing() { return playing; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; }, get treasures() { return treasures; }, sparkle, get digPh() { return digPh; },
 };

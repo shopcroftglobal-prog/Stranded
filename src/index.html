@@ -309,6 +309,19 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
 #guide small { display: block; color: #ffd060; font-size: 12px; }
 #bookList .quest { grid-column: 1 / -1; }
 .swatch { display: inline-block; width: 22px; height: 22px; border: 2px solid #1a0905; }
+.quest.look { grid-template-columns: auto 1fr auto; }
+.quest.look.locked { opacity: 0.75; }
+.suitpic { width: 48px; height: 60px; image-rendering: pixelated; background: radial-gradient(#3a2018, #1a0905); border: 1px solid #4a2416; }
+.suitpic.sm { width: 24px; height: 30px; vertical-align: middle; margin-right: 6px; }
+.rar { font-size: 11px; padding: 1px 6px; border-radius: 8px; margin-left: 4px; }
+.rar.rare { background: #2a4a8a; color: #cfe0ff; } .rar.epic { background: #6a2a8a; color: #f0d0ff; }
+.tset { grid-column: 1 / -1; border: 1px solid #4a2416; padding: 8px; margin: 6px 0; }
+.tset .thead { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; } .tset .thead span { opacity: 0.85; } .tset .tprize { margin-left: auto; font-size: 13px; }
+.tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+.titem { text-align: center; padding: 6px 4px; background: #1a0905; border: 1px solid #3a1a10; font-size: 12px; }
+.titem img { width: 48px; height: 48px; image-rendering: pixelated; display: block; margin: 0 auto 4px; }
+.titem.got { border-color: #e8c547; background: #2a1408; }
+.titem small { display: block; opacity: 0.7; font-size: 11px; }
 .quest { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 6px 8px; border: 1px solid #4a2416; margin: 4px 0; }
 .quest .qbar { width: 90px; height: 8px; background: #1a0905; border: 1px solid #4a2416; position: relative; } .quest .qbar i { position: absolute; left: 0; top: 0; bottom: 0; background: #7dff9a; }
 .quest.done { border-color: #7dff9a; } .badge { display: grid; grid-template-columns: 34px 1fr; gap: 8px; align-items: center; padding: 4px; opacity: 0.45; } .badge.got { opacity: 1; }

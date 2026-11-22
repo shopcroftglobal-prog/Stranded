@@ -197,3 +197,11 @@ Each new place is based on a real place on Mars:
 - Proxima b: small ash volcanoes. TRAPPIST-1e: sandy beaches and grey sea cliffs. LHS 1140 b: ice cliffs and blue crevasses.
 - Clouds on worlds with air. New block: Sand.
 - Screenshots: screenshots/worlds-v23/. Test: test/worlds2.js. The walkthrough bot now plays in first person.
+
+## Version 24: treasures and suits
+- 36 treasures, 6 on each world, each one based on something real (iron rocks from space on Mars, the Apollo orange glass beads, Europa's salt, and more). Each comes with a short true fact.
+- Find them three ways: hidden in certain blocks when you dig, inside old supply boxes, or as a sparkle with a light beam lying on the ground nearby (walk to it). Each treasure gives 40 coins and XP.
+- New Treasures page in the book (B) with a picture of each treasure and a hint for the missing ones.
+- 14 new suits with patterns: Lime, Rust (camo), Racing (stripes) for coins; Night sky (stars), Glow lines, Lava for Gems; reward suits for finishing each world's treasures (Red planet, Moon dust, Ice crystal, Red sun, Deep sea, Snow), Gold for every treasure, Dragon scale for beating a dragon.
+- The Looks page shows a picture of every suit. Friends see your suit in the camp.
+- Code: src/treasures.js, suit patterns in src/characters.js. Test: test/treasures.js.

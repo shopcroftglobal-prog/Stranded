@@ -68,12 +68,46 @@ export const SUITS = {
   sun:  { name: 'Sun',  suit: '#e8b23c', trim: '#3a3f4a', dark: '#4a3a2a', glass: '#1a1f2e' },
   berry: { name: 'Berry', suit: '#8a3a6e', trim: '#6fd6b0', dark: '#2e1a2a', glass: '#141a24' },
   frost: { name: 'Frost', suit: '#d6e4ee', trim: '#e8607e', dark: '#3a4656', glass: '#18243a' },
+  // skins with patterns. pattern: stripes, spots, stars, glow, camo, gold, scales, check, lava
+  lime: { name: 'Lime', suit: '#9ad04a', trim: '#6a3aa8', dark: '#2e3a22', glass: '#16202c' },
+  racing: { name: 'Racing', suit: '#f0ece4', trim: '#d8342a', dark: '#2a2a30', glass: '#101418', pattern: 'stripes' },
+  rust: { name: 'Rust', suit: '#a8643a', trim: '#5a3a24', dark: '#3a2a20', glass: '#1c2228', pattern: 'camo', alt: '#7a4a2a' },
+  night: { name: 'Night sky', suit: '#1e2440', trim: '#8a7aff', dark: '#10142a', glass: '#0a0c18', pattern: 'stars' },
+  glowline: { name: 'Glow lines', suit: '#26303a', trim: '#3affd0', dark: '#141a20', glass: '#0a1416', pattern: 'glow' },
+  lava: { name: 'Lava', suit: '#2a2226', trim: '#ff6a2a', dark: '#181214', glass: '#1a0a06', pattern: 'lava' },
+  redplanet: { name: 'Red planet', suit: '#c4562a', trim: '#f0d8b0', dark: '#4a2418', glass: '#1a1418', pattern: 'camo', alt: '#9e3f20' },
+  moondust: { name: 'Moon dust', suit: '#b8b4ac', trim: '#4a4e58', dark: '#3a3a3e', glass: '#141820', pattern: 'spots', alt: '#8e8c88' },
+  icecrystal: { name: 'Ice crystal', suit: '#cfe8f6', trim: '#5ab8f0', dark: '#3a5670', glass: '#0e2038', pattern: 'glow' },
+  redsun: { name: 'Red sun', suit: '#6a2a2a', trim: '#ffb04a', dark: '#2a1212', glass: '#1a0a0a', pattern: 'lava' },
+  deepsea: { name: 'Deep sea', suit: '#1e6a72', trim: '#9af0e0', dark: '#123a40', glass: '#081418', pattern: 'scales', alt: '#175a60' },
+  snow: { name: 'Snow', suit: '#f4f6f8', trim: '#3a8ad8', dark: '#5a6a7a', glass: '#142034', pattern: 'spots', alt: '#d8e2ea' },
+  gold: { name: 'Gold', suit: '#e8b830', trim: '#fff4b0', dark: '#6a4a10', glass: '#1a1408', pattern: 'gold' },
+  dragon: { name: 'Dragon scale', suit: '#4a2a5a', trim: '#e8c547', dark: '#22122a', glass: '#100814', pattern: 'scales', alt: '#3a2048' },
 };
+// paints the suit cloth with the skin's pattern. Returns a colour or [colour, glow].
+function suitPaint(S, suit, trim, dark) {
+  const alt = S.alt ? tones(S.alt) : dark;
+  return (face, i, j, seed) => {
+    const base = pick(suit, hash(i, j, seed));
+    switch (S.pattern) {
+      case 'stripes': return (i === 4 || i === 5) && face !== 'top' && face !== 'bottom' ? trim[1] : base;
+      case 'camo': { const v = hash(Math.floor(i / 3) + seed, Math.floor(j / 3), 7); return v > 0.66 ? pick(alt, hash(i, j, seed + 1)) : v < 0.22 ? dark[1] : base; }
+      case 'spots': return hash(Math.floor(i / 2) + seed, Math.floor(j / 2), 9) > 0.8 ? alt[1] : base;
+      case 'stars': { const h = hash(i, j, seed + 3); return h > 0.95 ? ['#ffffff', '#c8d0ff'] : h > 0.9 ? [trim[0], trim[0]] : base; }
+      case 'glow': return (i + j * 2) % 7 === 0 ? [trim[1], trim[1]] : base;
+      case 'lava': { const v = Math.abs(Math.sin(i * 0.9 + seed) * 2 + j * 0.7 - 4 - (seed % 5)); return v < 0.6 ? [trim[0], '#ff4a10'] : base; }
+      case 'gold': return hash(i, j, seed + 5) > 0.9 ? [trim[0], '#806010'] : (i + j) % 9 === 0 ? trim[2] : base;
+      case 'scales': return ((i + (Math.floor(j / 2) % 2) * 2) % 4 === 0 || j % 2 === 0 && i % 4 === 1) ? alt[0] : base;
+      case 'check': return (Math.floor(i / 2) + Math.floor(j / 2)) % 2 ? dark[1] : base;
+      default: return base;
+    }
+  };
+}
 export function makePilot(suitId = 'sand') {
   const S = SUITS[suitId] || SUITS.sand;
   const suit = tones(S.suit), trim = tones(S.trim), dark = tones(S.dark);
   const root = new THREE.Group(); const rig = {};
-  const cloth = (seed) => (face, i, j) => pick(suit, hash(i, j, seed));
+  const paint = suitPaint(S, suit, trim, dark);
 
   // legs 5x8x5, boots are the bottom 3 rows, a knee pad on the front
   for (const s of [-1, 1]) {
@@ -81,7 +115,7 @@ export function makePilot(suitId = 'sand') {
       if (face === 'bottom') return dark[2];
       if (j >= 5) return j === 5 ? trim[2] : pick(dark, hash(i, j, 30));
       if (face === 'front' && j >= 1 && j <= 2 && i >= 1 && i <= 3) return trim[1];
-      return pick(suit, hash(i, j, 31 + s));
+      return paint(face, i, j, 31 + s);
     });
     rig[s < 0 ? 'legL' : 'legR'] = part(root, leg, s * 3, 8, 0, 0, -4, 0);
   }
@@ -98,7 +132,7 @@ export function makePilot(suitId = 'sand') {
       }
     }
     if (j === 1 && face !== 'top') return trim[1];
-    return pick(suit, hash(i, j, 41));
+    return paint(face, i, j, 41);
   });
   part(root, body, 0, 13, 0);
   // backpack 10x9x4 with two air tank stripes and a vent
@@ -116,14 +150,14 @@ export function makePilot(suitId = 'sand') {
       if (j >= 7 || face === 'bottom') return pick(trim, hash(i, j, 60));
       if (j === 6) return dark[0];
       if (j === 0 && face === 'top') return suit[0];
-      return pick(suit, hash(i, j, 61 + s));
+      return paint(face, i, j, 61 + s);
     });
     rig[s < 0 ? 'armL' : 'armR'] = part(root, arm, s * 8, 17.5, 0, 0, -4.5, 0);
   }
   // helmet 12x11x11 with a wide visor and two soft eye lights behind the glass
   const head = new THREE.Group(); head.position.set(0, 18 * PX, 0); root.add(head); rig.head = head;
   const helmet = box(12, 11, 11, (face, i, j, fw, fh) => {
-    const shell = pick(suit, hash(i, j, 70));
+    const shell = paint(face, i, j, 70);
     if (face === 'front') {
       if (i >= 2 && i <= 9 && j >= 3 && j <= 8) {
         if (j === 3 || i === 2 || i === 9) return shade(S.glass, 1.3);
