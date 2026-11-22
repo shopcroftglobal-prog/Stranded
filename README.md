@@ -205,3 +205,12 @@ Each new place is based on a real place on Mars:
 - 14 new suits with patterns: Lime, Rust (camo), Racing (stripes) for coins; Night sky (stars), Glow lines, Lava for Gems; reward suits for finishing each world's treasures (Red planet, Moon dust, Ice crystal, Red sun, Deep sea, Snow), Gold for every treasure, Dragon scale for beating a dragon.
 - The Looks page shows a picture of every suit. Friends see your suit in the camp.
 - Code: src/treasures.js, suit patterns in src/characters.js. Test: test/treasures.js.
+
+## Version 25: better visuals
+- Colour grading on Normal and Far view: richer colour, warm days, cool blue nights, golden sunsets, soft dark corners.
+- Low haze: dust (or mist) settles in valleys, canyons and craters, so deep places look deep.
+- Lamps light up the ground round them at night (the 6 nearest; off on the Fast setting).
+- The ship has red and green side lights and a white blink on top.
+- Floating dust on Mars, ice glitter on cold worlds, embers on Proxima b, shooting stars on clear nights.
+- Far mountains on the horizon on every world with air.
+- Screenshots: screenshots/visuals-v25/. Test: test/visuals.js.

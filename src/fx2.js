@@ -327,3 +327,65 @@ export function createPlumes(scene) {
     reset() { for (const s of list) s.y = null; },
   };
 }
+
+// ---- tiny bits floating in the air round you: dust on Mars, ice glitter on cold worlds, embers near lava
+export function createMotes(scene) {
+  const N = 500, pos = new Float32Array(N * 3), seeds = [];
+  for (let i = 0; i < N; i++) { seeds.push([Math.random() * 40 - 20, Math.random() * 14 - 3, Math.random() * 40 - 20, Math.random()]); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const tex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 16; const x = cv.getContext('2d'); const gr = x.createRadialGradient(8, 8, 0, 8, 8, 8); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 16, 16); return new THREE.CanvasTexture(cv); })();
+  const mat = new THREE.PointsMaterial({ map: tex, size: 0.16, transparent: true, opacity: 0.5, depthWrite: false, color: 0xe8c8a0 });
+  const p = new THREE.Points(geo, mat); p.frustumCulled = false; p.visible = false; scene.add(p);
+  let t = 0;
+  return {
+    update(dt, cam, kind, k) {
+      p.visible = !!kind && k > 0.01; if (!p.visible) return;
+      t += dt;
+      const look = { dust: [0xe8c8a0, 0.16, THREE.NormalBlending, 0.45], ice: [0xeaf6ff, 0.12, THREE.AdditiveBlending, 0.8], ember: [0xff8a3a, 0.14, THREE.AdditiveBlending, 0.9] }[kind];
+      mat.color.set(look[0]); mat.size = look[1]; if (mat.blending !== look[2]) { mat.blending = look[2]; mat.needsUpdate = true; } mat.opacity = look[3] * k;
+      const a = geo.attributes.position.array, rise = kind === 'ember' ? 0.8 : kind === 'ice' ? -0.25 : 0.05, wind = kind === 'dust' ? 1.6 : 0.5;
+      for (let i = 0; i < N; i++) {
+        const s = seeds[i];
+        let x = s[0] + t * wind * (0.6 + s[3]) + Math.sin(t * 0.7 + i) * 0.6, y = s[1] + t * rise * (0.5 + s[3]) + Math.sin(t * 1.3 + i * 2) * 0.3, z = s[2] + Math.cos(t * 0.5 + i) * 0.6;
+        x = ((x - cam.x) % 40 + 60) % 40 - 20 + cam.x; y = ((y - cam.y) % 17 + 20.5) % 17 - 3.5 + cam.y; z = ((z - cam.z) % 40 + 60) % 40 - 20 + cam.z;
+        a[i * 3] = x; a[i * 3 + 1] = y; a[i * 3 + 2] = z;
+      }
+      geo.attributes.position.needsUpdate = true;
+    },
+  };
+}
+
+// ---- shooting stars on clear nights
+export function createShootingStars(scene) {
+  const list = [];
+  const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  for (let i = 0; i < 3; i++) {
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    const l = new THREE.Line(geo, mat.clone()); l.frustumCulled = false; l.renderOrder = -2; l.visible = false; scene.add(l);
+    list.push({ l, t: 0, life: 0, p: new THREE.Vector3(), v: new THREE.Vector3() });
+  }
+  let wait = 4;
+  return {
+    update(dt, cam, on) {
+      wait -= dt;
+      if (on && wait <= 0) {
+        wait = 3 + Math.random() * 9;
+        const s = list.find(x => x.life <= 0);
+        if (s) {
+          const a = Math.random() * Math.PI * 2;
+          s.p.set(Math.cos(a) * 380, 160 + Math.random() * 140, Math.sin(a) * 380);
+          s.v.set(-Math.cos(a) + (Math.random() - 0.5), -0.35 - Math.random() * 0.3, -Math.sin(a) + (Math.random() - 0.5)).normalize().multiplyScalar(260 + Math.random() * 160);
+          s.life = s.t = 0.7 + Math.random() * 0.6;
+        }
+      }
+      for (const s of list) {
+        if (s.life <= 0) { s.l.visible = false; continue; }
+        s.life -= dt; s.p.addScaledVector(s.v, dt);
+        const a = s.l.geometry.attributes.position.array, tail = s.p.clone().addScaledVector(s.v, -0.12);
+        a[0] = cam.x + s.p.x; a[1] = cam.y + s.p.y; a[2] = cam.z + s.p.z; a[3] = cam.x + tail.x; a[4] = cam.y + tail.y; a[5] = cam.z + tail.z;
+        s.l.geometry.attributes.position.needsUpdate = true;
+        s.l.material.opacity = Math.sin(Math.PI * Math.max(0, s.life) / s.t) * 0.9; s.l.visible = on;
+      }
+    },
+  };
+}

@@ -24,11 +24,12 @@ import { buildSky, Cloud, Bits } from './effects.js';
 import { PLANETS, planetById, gravityWords, tempWords, starWords, distanceWords, jumpWords } from './planets.js';
 import { worldParams } from './looks.js';
 import { createWater } from './water.js';
-import { createSunset, createAurora, createWeather, createPrints, createDaySky, createFarHills, createDustDevils, createClouds, createPlumes } from './fx2.js';
+import { createSunset, createAurora, createWeather, createPrints, createDaySky, createFarHills, createDustDevils, createClouds, createPlumes, createMotes, createShootingStars } from './fx2.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { shipBlocks, SMOKE_POINTS, DEBRIS, SHIP_BASE } from './ship.js';
 import { initAudio, sfx, setVolume, setMusic, setMood, startMusic, restartMusic } from './audio.js';
 import { createAdventure, MAX_HP, MAX_AIR, LAST_WAVE, STAGES, stageOf, DRAGONS, FINDS, RARE_OF } from './adventure.js';
@@ -73,7 +74,23 @@ function setupGlow() {
   bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.5, 0.82);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
+  composer.addPass(grade);
 }
+// colour grade: a touch more colour and contrast, warm days, cool blue nights, dark corners
+const grade = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTint: { value: new THREE.Vector3(1, 1, 1) }, uSat: { value: 1.12 }, uCon: { value: 1.06 }, uVig: { value: 0.32 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 uTint; uniform float uSat, uCon, uVig; varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      vec3 col = c.rgb * uTint;
+      float l = dot(col, vec3(0.299, 0.587, 0.114));
+      col = mix(vec3(l), col, uSat);
+      col = (col - 0.5) * uCon + 0.5;
+      vec2 d = vUv - 0.5; col *= 1.0 - uVig * smoothstep(0.25, 0.85, dot(d, d) * 2.2);
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), c.a);
+    }`,
+});
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020106);
@@ -101,11 +118,22 @@ let composer = null, bloom = null;
 water = createWater(scene);
 const lavaSea = createWater(scene, { lava: true });
 const sunset = createSunset(scene), aurora = createAurora(scene), weather = createWeather(scene), prints = createPrints(scene);
-const daySky = createDaySky(scene), farHills = createFarHills(scene), devils = createDustDevils(scene), clouds = createClouds(scene), plumes = createPlumes(scene);
+const daySky = createDaySky(scene), farHills = createFarHills(scene), devils = createDustDevils(scene), clouds = createClouds(scene), plumes = createPlumes(scene), motes = createMotes(scene), shooting = createShootingStars(scene);
 let weatherT = 30, weatherOn = false;
 
 const atlas = buildAtlas();
 const mat = new THREE.MeshLambertMaterial({ map: atlas.map, emissiveMap: atlas.emissiveMap, emissive: 0xffffff, emissiveIntensity: 0.9, vertexColors: true, alphaTest: 0.5 });
+// low ground haze: dust (or mist) settles in valleys, canyons and craters
+const hazeU = { uHaze: { value: 0 }, uHazeTop: { value: 30 } };
+mat.onBeforeCompile = (sh) => {
+  Object.assign(sh.uniforms, hazeU);
+  sh.vertexShader = 'varying float vWY;\n' + sh.vertexShader.replace('#include <fog_vertex>', '#include <fog_vertex>\n vWY = (modelMatrix * vec4(transformed, 1.0)).y;');
+  sh.fragmentShader = 'varying float vWY; uniform float uHaze, uHazeTop;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `#include <fog_fragment>
+    #ifdef USE_FOG
+      float hz = uHaze * smoothstep(uHazeTop, uHazeTop - 12.0, vWY) * smoothstep(3.0, 30.0, vFogDepth);
+      gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, hz);
+    #endif`);
+};
 const cracks = buildCracks();
 const crackMat = new THREE.MeshBasicMaterial({ map: cracks[0], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 const crackBox = new THREE.Mesh(new THREE.BoxGeometry(1.004, 1.004, 1.004), crackMat);
@@ -2134,6 +2162,63 @@ function backToTop() {
 }
 $('upBtn').onclick = () => backToTop();
 if (TOUCH) $('upBtn').textContent = '⬆ Back to the top';
+// ---- lamps really light up the ground round them at night (the 6 nearest)
+const LAMP_LIGHTS = [];
+for (let i = 0; i < 6; i++) { const l = new THREE.PointLight(0xffffff, 0, 14, 1.4); l.castShadow = false; scene.add(l); LAMP_LIGHTS.push(l); }
+const LAMP_COL = {};
+let lampT = 0;
+function lampColour(id) {
+  if (id in LAMP_COL) return LAMP_COL[id];
+  let c = null;
+  if (id === B.LAMP) c = 0xc890ff;
+  else if (id === B.GLASS_ON) c = null;
+  else { for (const [col, item] of FAMILY_ITEMS.lamp || []) if (ITEMS[item] && ITEMS[item].block === id) c = new THREE.Color(COLOUR[col].hex).getHex(); }
+  return (LAMP_COL[id] = c);
+}
+function updateLampLights(dt, day) {
+  lampT -= dt;
+  if (lampT <= 0) {
+    lampT = 0.6;
+    const found = [], px = player.pos.x, py = player.pos.y, pz = player.pos.z;
+    for (const [k, ed] of world.edits) {
+      const [cx, cz] = k.split(',').map(Number);
+      if (Math.abs(cx * CS + 8 - px) > 34 || Math.abs(cz * CS + 8 - pz) > 34) continue;
+      for (const [i, id] of ed) {
+        const c = lampColour(id); if (c == null) continue;
+        const x = cx * CS + (i % CS), z = cz * CS + (Math.floor(i / CS) % CS), y = Math.floor(i / (CS * CS));
+        const d = (x - px) ** 2 + (y - py) ** 2 + (z - pz) ** 2; if (d > 30 * 30) continue;
+        found.push([d, x, y, z, c]);
+      }
+    }
+    found.sort((a, b) => a[0] - b[0]);
+    LAMP_LIGHTS.forEach((l, j) => { const f = found[j]; l.userData.on = !!f; if (f) { l.position.set(f[1] + 0.5, f[2] + 0.5, f[3] + 0.5); l.color.setHex(f[4]); } });
+  }
+  const k = 0.35 + 1.9 * (1 - day);
+  const fast = settings.quality === 'low';
+  for (const l of LAMP_LIGHTS) { l.visible = !fast && !!l.userData.on; l.intensity = l.userData.on ? k * 3.4 : 0; }
+}
+// ---- the ship's lights: red on the left, green on the right, a white blink on top
+const shipLights = (() => {
+  const dot = (col, s) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const x = cv.getContext('2d'); const g = x.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.3, 'rgba(255,255,255,0.6)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(cv); })(), color: col, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); sp.scale.set(s, s, 1); scene.add(sp); return sp; };
+  return { red: dot(0xff3020, 1.4), green: dot(0x30ff60, 1.4), top: dot(0xffffff, 2.2), box: null, t: 0, key: '' };
+})();
+function updateShipLights(dt) {
+  const L = shipLights; L.t += dt;
+  const show = playing && !race.active && !shipMesh && world && world.structure.size > 0;
+  for (const k of ['red', 'green', 'top']) L[k].visible = show;
+  if (!show) return;
+  const key = look.planet.id + world.structure.size;
+  if (L.key !== key) {
+    L.key = key; let a = [1e9, 1e9, 1e9], b = [-1e9, -1e9, -1e9];
+    for (const k of world.structure.keys()) { const p = k.split(',').map(Number); if (Math.hypot(p[0] - SHIP_CENTER.x, p[2] - SHIP_CENTER.z) > 9) continue; for (let i = 0; i < 3; i++) { a[i] = Math.min(a[i], p[i]); b[i] = Math.max(b[i], p[i]); } }
+    L.box = { a, b };
+  }
+  const { a, b } = L.box, cz = (a[2] + b[2] + 1) / 2, cx = (a[0] + b[0] + 1) / 2;
+  L.red.position.set(a[0] - 0.2, a[1] + 1.5, cz); L.green.position.set(b[0] + 1.2, a[1] + 1.5, cz); L.top.position.set(cx, b[1] + 1.3, cz);
+  const blink = (L.t % 1.4) < 0.12;
+  L.top.material.opacity = blink ? 1 : 0.05;
+  L.red.material.opacity = L.green.material.opacity = 0.75 + 0.25 * Math.sin(L.t * 2);
+}
 // ---- a sparkle lying on the ground somewhere near you: walk to it to pick up a treasure
 const sparkle = (() => {
   const g = new THREE.Group();
@@ -2179,8 +2264,19 @@ function updateLooks(dt) {
   const marsy = id === 'mars' && !race.active;
   const day = adv.daylight ?? 1, storm = !!(state.storm && state.storm.on);
   daySky.update(camera.position, adv.sunDir, day, marsy);
-  farHills.update(camera.position, scene.fog.color, marsy);
+  farHills.update(camera.position, scene.fog.color, !race.active && ['mars', 'proxima', 'trappist1e', 'lhs1140b'].includes(id));
   devils.update(dt, player.pos, (x, z) => world.surfaceY(x, z), marsy && !storm && playing ? Math.max(0, day * 1.4 - 0.4) : 0);
+  // floating bits, shooting stars, ground haze, colour grade, lamp and ship lights
+  const moteKind = race.active ? null : id === 'mars' ? 'dust' : id === 'proxima' ? 'ember' : id === 'moon' ? null : 'ice';
+  motes.update(dt, camera.position, moteKind, id === 'mars' ? (storm ? 0.2 : 0.4 + 0.6 * day) : 0.4 + 0.6 * (1 - day));
+  shooting.update(dt, camera.position, !race.active && day < 0.3 && look.sky.stars > 0.3 && !storm);
+  hazeU.uHaze.value = race.active ? 0 : ({ mars: 0.5, europa: 0.25, proxima: 0.4, trappist1e: 0.45, lhs1140b: 0.4, moon: 0 }[id] ?? 0) * (storm ? 1.4 : 1);
+  hazeU.uHazeTop.value = look.terrain.sea ? look.terrain.sea + 4 : 29;
+  { const n = 1 - day, sk = adv.sunDir.y > -0.1 && adv.sunDir.y < 0.2 ? 1 - Math.abs(adv.sunDir.y - 0.05) / 0.15 : 0;
+    grade.uniforms.uTint.value.set(1.02 - 0.12 * n + 0.06 * Math.max(0, sk), 1.0 - 0.05 * n, 0.98 + 0.12 * n - 0.06 * Math.max(0, sk));
+    grade.uniforms.uSat.value = race.active ? 1.1 : 1.14 - 0.12 * n; }
+  updateLampLights(dt, day);
+  updateShipLights(dt);
   // high clouds where there is air; plumes on Europa
   const air = look.planet.real.air;
   const cloudK = air === 'none' || race.active ? 0 : (id === 'mars' ? 0.3 : 0.5) * (0.2 + 0.8 * day) * (storm ? 0.3 : 1);
