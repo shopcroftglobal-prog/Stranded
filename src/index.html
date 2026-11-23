@@ -300,7 +300,25 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
 .rres i { width: 14px; height: 14px; display: block; } .rres.me { background: rgba(255,208,96,0.15); color: #ffd060; }
 #race h3 { margin: 12px 0 6px; font-size: 16px; color: #ffd7b0; }
 .racebtn { background: linear-gradient(90deg, #4ab0f0, #9a5ae0); border-color: #c890ff; color: #fff; }
-#tChat { display: none; } .camp #tChat { display: block; }
+#tChat { display: none; } .camp #tChat, .chaton #tChat { display: block; }
+#chatFeed { position: absolute; left: 12px; bottom: 120px; font-size: 14px; background: rgba(26,9,5,0.6); padding: 6px 10px; width: min(380px, calc(100vw - 24px)); pointer-events: none; line-height: 1.35; }
+#chatFeed b, #chatHist b { color: #ffd060; font-weight: 400; } #chatFeed .me b, #chatHist .me b { color: #7dff9a; } #chatFeed i, #chatHist i { color: var(--muted); font-style: normal; font-size: 12px; }
+.touch #chatFeed { bottom: auto; top: calc(96px + env(safe-area-inset-top, 0px)); font-size: 12px; width: min(300px, 60vw); }
+#chatHist { height: min(220px, 34vh); overflow-y: auto; background: rgba(20,10,8,0.6); border: 1px solid #4a2416; padding: 6px 8px; margin-bottom: 8px; font-size: 14px; line-height: 1.4; -webkit-user-select: text; user-select: text; }
+.chatin { display: flex; gap: 6px; } .chatin input { flex: 1; min-width: 0; font: inherit; font-size: 16px; background: #1e0e08; color: #f4e2c8; border: 2px solid #8a3a1e; padding: 6px 8px; -webkit-user-select: text; user-select: text; }
+.chatin button { padding: 6px 12px; } #chatMic.on { background: #8a2a2a; border-color: #ff7070; animation: pulse 0.8s infinite alternate; }
+.chatnote { font-size: 12px; margin: 6px 0 10px !important; }
+.prow { border: 1px solid #4a2416; background: rgba(60,25,14,0.3); padding: 6px 8px; margin: 6px 0; display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
+.pname span { display: block; font-size: 12px; color: var(--muted); } .pbtns { display: flex; gap: 4px; } .pbtns button { padding: 3px 8px; font-size: 13px; }
+.pvol, .preport { grid-column: 1 / -1; font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; } .pvol input { flex: 1; }
+.preport b { width: 100%; color: #ffd7b0; font-weight: 400; } .preport button { padding: 3px 8px; font-size: 13px; }
+#voiceBar { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); display: flex; gap: 6px; pointer-events: none; z-index: 60; font-size: 13px; }
+#voiceBar span { background: rgba(26,9,5,0.75); border: 1px solid #4a2416; padding: 3px 9px; color: #f4e2c8; white-space: nowrap; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
+#voiceBar span.live { border-color: #7dff9a; color: #7dff9a; box-shadow: 0 0 8px rgba(125,255,154,0.4); }
+.touch #voiceBar { bottom: auto; top: calc(60px + env(safe-area-inset-top, 0px)); }
+#tTalk { display: none; left: calc(26px + env(safe-area-inset-left, 0px)); bottom: calc(260px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; font-size: 14px; }
+.voiceon #tTalk { display: grid; } #tTalk.on { background: rgba(40,150,80,0.9); border-color: #7dff9a; }
+@media (orientation: portrait) { #tTalk { bottom: calc(290px + env(safe-area-inset-bottom, 0px)); } }
 .campbtn { background: linear-gradient(90deg, #4ac060, #4ab0f0); border-color: #a0f0c0; color: #0a1a10; font-weight: 700; }
 #friendsBox { margin: 6px 0; font-size: 13px; } #friendsBox b { color: #7dff9a; } #friendsBox div { color: #f4e2c8; } #friendsBox span { color: var(--muted); }
 #chatLog { position: absolute; left: 12px; bottom: 120px; font-size: 14px; background: rgba(26,9,5,0.6); padding: 6px 10px; max-width: 320px; pointer-events: none; }
@@ -373,6 +391,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <div id="toasts"></div>
   <div id="hint"></div>
   <div id="chatLog" class="hide"></div>
+  <div id="chatFeed" class="hide"></div>
   <div id="guide" class="hide"></div>
   <div id="tool"></div>
   <div id="hotbar"></div>
@@ -391,9 +410,11 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <button class="tbtn" id="tPlace">Use</button>
   <button class="tbtn" id="tScan">Scan</button>
   <button class="tbtn" id="tRover">Drive</button>
+  <button class="tbtn" id="tTalk">Talk</button>
   <div id="tmenu"><button id="tBag">Bag</button><button id="tBook">Book</button><button id="tChat">Say</button><button id="tFly">Fly</button><button id="tView">View</button><button id="tPrize">Prizes</button><button id="tShop">Shop</button><button id="tShip" class="far">Ship</button><button id="tPause">II</button></div>
 </div>
 
+<div id="voiceBar" class="hide"></div>
 <div id="lockmsg" class="panel hide">Click to look around</div>
 
 <div id="title" class="overlay">
@@ -422,6 +443,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
       <b>Place block</b><span>Tap Place. Tap a slot at the bottom to pick a block</span>
       <b>Bag and crafting</b><span>Bag, top right</span>
       <b>Ship repairs</b><span>Ship, when you're next to it</span>
+      <b>Chat with friends</b><span>Say, top right (when friends are online)</span>
       <b>Hit a creature</b><span>Hold Dig while aiming at it</span>
       <b>Use things</b><span>Aim at a beacon, Forge, box, bed or the Trader and tap Use</span>
       <b>Tip</b><span>Turn your phone sideways for more room</span>
@@ -438,6 +460,8 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
       <b>Hit a creature</b><span>Left click</span>
       <b>Scanner</b><span>Q</span>
       <b>Collection book</b><span>B</span>
+      <b>Chat with friends</b><span>T or Enter</span>
+      <b>Talk (when voice is on)</b><span>Hold Z</span>
       <b>Pause</b><span>Esc</span>
     </div></details>
   </div>
@@ -552,10 +576,20 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <div class="setrow"><span>Join a team</span><div><input id="teamCode" maxlength="4" placeholder="Code" style="width:90px;text-transform:uppercase;font:inherit;padding:6px"> <button id="teamJoin">Join</button></div></div>
   <p class="sub" id="teamNote"></p>
  </div></div>
- <div id="chatPanel" class="overlay hide"><div class="dialog panel" style="width:min(460px,100%)">
+ <div id="chatPanel" class="overlay hide"><div class="dialog panel" style="width:min(520px,100%)">
   <button class="close" data-close>Close (T)</button>
-  <h2>Say something</h2>
-  <div id="chatList" class="chatlist"></div>
+  <h2>Chat</h2>
+  <div id="chatTabs" class="tabs"><button data-ct="chat" class="on">Chat</button><button data-ct="people">Players</button><button data-ct="voice">Voice</button></div>
+  <div id="chatBody">
+   <div id="ct_chat">
+    <div id="chatHist"></div>
+    <div class="chatin"><input id="chatIn" maxlength="120" placeholder="Type a message, then Enter" autocomplete="off" enterkeyhint="send"><button id="chatMic" class="hide" title="Say it instead of typing">🎤</button><button id="chatSend">Send</button></div>
+    <p class="sub chatnote" id="chatNote"></p>
+    <div id="chatList" class="chatlist"></div>
+   </div>
+   <div id="ct_people" class="hide"></div>
+   <div id="ct_voice" class="hide"></div>
+  </div>
 </div></div>
  <div id="giftPanel" class="overlay hide"><div class="dialog panel" style="width:min(520px,100%)">
   <button class="close" data-close>Close</button>

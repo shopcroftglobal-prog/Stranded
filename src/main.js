@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as rigsMod from './rigs.js';
 import { createRace } from './race.js';
 import { createFriends, PHRASES } from './friends.js';
+import { createChat } from './chat.js';
 import { makeRover, makePilot, animate, SUITS } from './characters.js';
 const LOOKS = { suit: { sand: 0, sea: 100, sun: 100, berry: 250, frost: 250, lime: 300, rust: 400, racing: 500,
   night: { gems: 3 }, glowline: { gems: 4 }, lava: { gems: 5 },
@@ -154,7 +155,7 @@ const freshState = () => ({
 });
 let state = freshState();
 let team = null;   // { code, world } when playing a world together
-let inCamp = false, friends = null, quests = null, pets = null, hooks = null, treasures = null;
+let inCamp = false, friends = null, chat = null, quests = null, pets = null, hooks = null, treasures = null;
 let world, player;
 let playing = false, paused = false;
 let shipMesh = null, launchT = -1;
@@ -1342,6 +1343,7 @@ const turn = (dx, dy) => {
 };
 window.addEventListener('keydown', (e) => {
   if (!playing) return;
+  if (chat && chat.typing) return;
   if (e.code === 'Escape') {
     if (dragMode || !document.pointerLockElement) {
       if (panelOpen()) { if (!$('win').classList.contains('hide')) return; closePanels(); } else openPanel('pause');
@@ -1362,8 +1364,9 @@ window.addEventListener('keydown', (e) => {
     if (!$('buildPanel').classList.contains('hide')) closePanels(); else if (!panelOpen() && launchT < 0 && state.won) openPanel('buildPanel');
     return;
   }
-  if (e.code === 'KeyT' && inCamp) {
-    if (!$('chatPanel').classList.contains('hide')) closePanels(); else if (!panelOpen()) openPanel('chatPanel');
+  if (e.code === 'KeyT' || (e.code === 'Enter' && !panelOpen())) {
+    if (!$('chatPanel').classList.contains('hide')) closePanels(); else if (!panelOpen()) chat.open(e.code === 'Enter' || chat.online);
+    e.preventDefault();
     return;
   }
   if (e.code === 'KeyB') {
@@ -1384,6 +1387,10 @@ window.addEventListener('keydown', (e) => {
   keys.add(e.code);
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
+// hold Z to talk (voice chat), also while racing
+window.addEventListener('keydown', (e) => { if (e.code === 'KeyZ' && !e.repeat && chat && !chat.typing) chat.talk(true); });
+window.addEventListener('keyup', (e) => { if (e.code === 'KeyZ' && chat) chat.talk(false); });
+window.addEventListener('blur', () => { if (chat) chat.talk(false); });
 window.addEventListener('blur', () => { keys.clear(); mouse.left = false; });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 canvas.addEventListener('mousedown', (e) => {
@@ -1492,7 +1499,7 @@ function setupTouch() {
   tap('tShip', () => { if (launchT >= 0) return; if (nearShip()) openPanel('shipPanel'); else findShip(); });
   tap('tPause', () => openPanel('pause'));
   tap('tBook', () => { if (launchT < 0) openPanel('bookPanel'); });
-  tap('tChat', () => { if (inCamp) openPanel('chatPanel'); });
+  tap('tChat', () => chat.open(false));
   tap('tFly', () => { if (!profile.free) return; player.fly = !player.fly; toast(player.fly ? 'Flying: hold Jump to go up. Tap Fly again to land.' : 'Flying off.'); });
   hold('tScan', () => adv.scan(), () => { });
   tap('tRover', () => toggleRover());
@@ -1672,6 +1679,7 @@ const nextFrame = () => { if (!FILM) requestAnimationFrame(frame); };
 function frame(filmDt, noDraw) {
   const dt = FILM ? (filmDt || 1 / 24) : Math.min(0.05, clock.getDelta());
   if (FILM) clock.elapsedTime += dt;
+  if (chat) chat.update(dt);
   if (race.active) { race.frame(dt); nextFrame(); return; }
   if (playing && friends) friends.update(dt, clock.elapsedTime);
   if (pets) pets.update(playing && !panelOpen() ? dt : 0);
@@ -2051,18 +2059,22 @@ function renderGift() {
     row.appendChild(bs); list.appendChild(row);
   }
 }
-function renderChat() {
-  $('chatList').innerHTML = '';
-  for (const p of PHRASES) { const b = document.createElement('button'); b.textContent = p; b.onclick = () => { friends.chat(p); closePanels(); }; $('chatList').appendChild(b); }
-}
+function renderChat() { if (chat) chat.renderPanel(); }
 friends = createFriends({ suit: () => profile.suit || null,
   scene, world: () => world, player: () => player, toast: (t) => toast(t),
   whereNow: () => (inCamp ? 'camp' : playing ? look.planet.id : 'title'),
   itemOk: (k) => !!ITEMS[k] && !ITEMS[k].tool && !ITEMS[k].part && !ITEMS[k].weapon && !ITEMS[k].shield && !ITEMS[k].tier,
   gotGift: (k, n, from) => { if (!inCamp) return; give(k, n, true); sfx.catch(); banner('A gift!', `${from} gave you ${n} ${ITEMS[k].name}.`); writeSave(); },
-  onChat: (log) => { $('chatLog').innerHTML = log.map(l => `<div>${l.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</div>`).join(''); $('chatLog').classList.remove('hide'); clearTimeout(renderChat.t); renderChat.t = setTimeout(() => $('chatLog').classList.add('hide'), 9000); },
+  onChat: () => { },                 // chat lines are shown by chat.js
+  hidden: (k) => !!chat && chat.hidden(k), clean: (t) => (chat ? chat.clean(t) : ''),
   onLobby: () => renderFriendsBox(),
   onTeam: () => { if (team && state) renderGoal(); },
+});
+chat = createChat({ friends, toast: (t) => toast(t), sfx, phrases: PHRASES, touch: TOUCH,
+  place: () => (race.active ? 'race' : inCamp ? 'camp' : team ? 'team-' + team.code : playing && look ? look.planet.id : 'title'),
+  placeName: (w) => { const p = planetById(w); return p ? `on ${p.name}` : ''; },
+  inCamp: () => inCamp, openPanel: (id) => openPanel(id), closePanels: () => closePanels(),
+  myPos: () => (player ? player.pos : null), posOf: (k, peer) => friends.posOf(k, peer),
 });
 async function renderFriendsBox() {
   const list = await friends.lobbyList();
@@ -2580,5 +2592,5 @@ window.__game = {
   start: () => { playing = true; $('hud').classList.remove('hide'); $('touch').classList.add('on'); for (const p of panels) $(p).classList.add('hide'); renderHotbar(); renderGoal(); },
   pending: () => updateChunks(50), landOn, get look() { return look; },
   hit: () => hit, mouse, keys, tch, TOUCH, dig, useAction, renderGoal, get launchT() { return launchT; },
-  adv, race, friends, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, frame, stepNow, findNear, canMake, RECIPES, ITEMS, PARTS, nearShip, SHIP_CENTER, SHIP_BASE, get playing() { return playing; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; }, get treasures() { return treasures; }, sparkle, get digPh() { return digPh; }, renderForge, renderMap, finalSteps,
+  adv, race, friends, get chat() { return chat; }, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, frame, stepNow, findNear, canMake, RECIPES, ITEMS, PARTS, nearShip, SHIP_CENTER, SHIP_BASE, get playing() { return playing; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; }, get treasures() { return treasures; }, sparkle, get digPh() { return digPh; }, renderForge, renderMap, finalSteps,
 };
