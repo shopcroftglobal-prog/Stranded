@@ -209,10 +209,14 @@ export function createChat(ctx) {
     let ok = false;
     if (db) {
       try {
+        // one private doc per reporter (reports/<my id>), one field per report; only the owner can read them
         let me = null; try { me = user && user.id ? await user.id() : null; } catch (e) { }
-        doc.from = me;
-        await db.collection('reports').doc('r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)).set(doc);
-        ok = true;
+        if (me) {
+          const ref = db.collection('reports').doc(String(me)), f = { ['r' + Date.now().toString(36)]: doc };
+          const snap = await ref.get().catch(() => null);
+          if (snap && snap.exists) await ref.update(f); else await ref.set(f);
+          ok = true;
+        }
       } catch (e) { ok = false; }
     }
     muted.add(k);

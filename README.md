@@ -229,10 +229,10 @@ Each new place is based on a real place on Mars:
 ## Version 27: text chat and voice chat
 - Press T or Enter (Say button on phones, shown when friends are online) to open Chat. Type a message and press Enter, or tap a quick phrase. Everyone online sees it, with where they are ("on Mars", "Friends' camp"). Messages also pop up over a friend's pilot in the camp and team worlds. Code: src/chat.js.
 - Kept friendly (src/chatfilter.js): rude words (English, and common Urdu/Hindi ones in English letters, including tricks like sh1t, f u c k, fuuuck) become stars; links, emails, phone numbers and @handles become ***. It runs on what you send and on what you receive. No more than 5 messages in 10 seconds, no repeats.
-- Players tab: Mute (hides their chat and voice for now), Block (also hides their pilot, remembered on this device), Report (picks a reason; saved with their last messages in db `reports`, which only the owner can read; they are muted too).
+- Players tab: Mute (hides their chat and voice for now), Block (also hides their pilot, remembered on this device), Report (picks a reason; saved with their last messages in db `reports/<reporter id>`, which only the reporter and the owner/Editors can read; they are muted too).
 - Voice tab: voice is always off when the game starts. Turn it on, then hold Z (Talk button on phones) to talk, or pick Always on. Only players in the same place hear you. Nearby voice: in the Friends' camp and team worlds friends get quieter with distance and can't be heard past 48 blocks. Per-player volume in Players.
   Voice goes straight between players (WebRTC, Google's free STUN); the room only carries the hand-shake (topic `rtc`).
 - The claude.ai page is not allowed to open the microphone, so there voice turns into "talk to type": hold Z and what you say becomes a chat message (🎤). You still hear friends whose device can talk. The 🎤 button in the chat box fills the text box by voice. Optional "Read chat out loud" uses Claude's voice.
 - Real voice everywhere (public website, phone app) needs a small online server; on hold until Maaz says go.
-- Artifact capabilities now also: room topics `chat` and `rtc` (Contributor), db rule `reports` (write Contributor, read owner/Editors), `dictation`, `tts`.
+- Artifact capabilities now also: room topics `chat` and `rtc` (Contributor), db rules `reports` (write self, read owner/Editors) + `reports/{self}`, `dictation`, `tts`.
 - Test: test/chat.js (two players: typing, filter both ways, spam guard, block, report, voice connect, push to talk, nearby fade, hang up).
