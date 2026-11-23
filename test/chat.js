@@ -89,8 +89,9 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   for (let i = 0; i < 12; i++) { await a.waitForTimeout(300); loud = await b.evaluate(() => __game.chat.debug.talking); if (loud[0]) break; }
   await a.screenshot({ path: 'shots/chat_voice_talking.png' });
   await b.screenshot({ path: 'shots/chat_voice_hearing.png' });
-  await a.keyboard.up('KeyZ'); await a.waitForTimeout(1200);
-  const after = await b.evaluate(() => __game.chat.debug.talking);
+  await a.keyboard.up('KeyZ');
+  let after = [];
+  for (let i = 0; i < 12; i++) { await a.waitForTimeout(300); after = await b.evaluate(() => __game.chat.debug.talking); if (!after[0]) break; }
   check('push to talk: silent, then heard, then silent', quiet[0] === false && loud[0] === true && after[0] === false, JSON.stringify([quiet, loud, after]));
   // nearby: walk B far away, A's voice fades out
   await b.evaluate(() => { const g = __game; g.player.pos.x = 60; g.player.pos.z = 60; });

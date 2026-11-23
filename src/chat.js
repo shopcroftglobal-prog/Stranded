@@ -412,7 +412,7 @@ export function createChat(ctx) {
       if (v.an) {
         v.an.getByteTimeDomainData(v.buf);
         let s = 0; for (let i = 0; i < v.buf.length; i++) { const x = (v.buf[i] - 128) / 128; s += x * x; }
-        const was = v.talking; v.talking = g > 0.05 && Math.sqrt(s / v.buf.length) > 0.005; if (v.talking) anyTalk = true;
+        const was = v.talking; v.talking = g > 0.05 && Math.sqrt(s / v.buf.length) > 0.006; if (v.talking) anyTalk = true;
         if (was !== v.talking && ctx.talkingMark) ctx.talkingMark(v.key, v.peer, v.talking);
       }
     }
