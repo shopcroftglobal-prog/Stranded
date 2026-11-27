@@ -225,3 +225,6 @@ Each new place is based on a real place on Mars:
   Glass world (blue-white star, blue crystal ground, Crystal dragon), Blue world (warm ocean world with beaches, Wave dragon), Ring world (desert under a giant ring, Gold dragon). From there the Milky Way hangs in the sky.
 - Arriving the first time: big celebration, +3000 coins and the Star traveller suit. Mars nights now show a faint Andromeda in the sky.
 - Test: test/final.js (forges every part, fits the drive, flies to all three new worlds).
+
+## Version 27: softer music
+- The background music was too sharp. It is now only soft sine tones (no buzzy triangle waves), played lower, through a warm low filter and a gentle echo. The tune steps between nearby notes instead of jumping to high bell notes. Music is quieter overall (src/audio.js).
