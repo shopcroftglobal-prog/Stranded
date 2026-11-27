@@ -397,3 +397,30 @@ RECIPES.push(
   { out: 'rod', n: 1, need: { sheet: 1, crystal: 1 }, note: 'Fish in the sea, or through the ice on icy worlds. Use, wait for a bite, then Use again.', once: true },
   { out: 'boat', n: 1, need: { metal: 4, sheet: 2 }, note: 'Hold it and Use on open water to sail. Jump to get off.', after: 'won', once: true },
 );
+// ---------------------------------------------------------------- villages and potions (Version 30)
+B.BREW = 155;
+def(B.BREW, { name: 'Potion table', item: 'brew', tiles: { top: 'brewTop', side: 'brew', bottom: 'shipDark' }, time: 1.0, use: 'brew' });
+// `drink` = what a potion does, `secs` = for how long
+Object.assign(ITEMS, {
+  brew: { name: 'Potion table', block: B.BREW },
+  bottle: { name: 'Bottle' },
+  p_heal: { name: 'Healing potion', drink: 'heal', colour: '#ff5a7a' },
+  p_speed: { name: 'Speed potion', drink: 'speed', secs: 180, colour: '#7ad8ff' },
+  p_jump: { name: 'Jump potion', drink: 'jump', secs: 180, colour: '#8aff7a' },
+  p_strong: { name: 'Strength potion', drink: 'strong', secs: 180, colour: '#ff8a3a' },
+  p_air: { name: 'Air potion', drink: 'air', secs: 180, colour: '#e8f4ff' },
+  p_night: { name: 'Night sight potion', drink: 'night', secs: 240, colour: '#b07aff' },
+});
+RECIPES.push(
+  { out: 'bottle', n: 3, need: { ice: 2, crystal: 1 }, note: 'Empty bottles for potions.' },
+  { out: 'brew', n: 1, need: { sheet: 2, crystal: 2, ice: 2 }, note: 'Place it and use it to make potions.', after: 'won' },
+);
+export const FX_NAMES = { speed: 'Speed', jump: 'Jump', strong: 'Strength', air: 'Air', night: 'Night sight' };
+export const BREW_RECIPES = [
+  { out: 'p_heal', n: 1, need: { bottle: 1, fruit: 2 }, note: 'Heals you a lot, right away.' },
+  { out: 'p_speed', n: 1, need: { bottle: 1, beans: 3, crystal: 1 }, note: 'Walk and run half as fast again, for 3 minutes.' },
+  { out: 'p_jump', n: 1, need: { bottle: 1, lettuce: 2, crystal: 1 }, note: 'Jump much higher, for 3 minutes.' },
+  { out: 'p_strong', n: 1, need: { bottle: 1, potato: 2, gold: 1 }, note: 'Hit half as hard again, for 3 minutes.' },
+  { out: 'p_air', n: 1, need: { bottle: 1, ice: 4, crystal: 1 }, note: 'Your air does not run down, for 3 minutes.' },
+  { out: 'p_night', n: 1, need: { bottle: 1, rawfish: 2, crystal: 1 }, note: 'See in the dark, for 4 minutes.' },
+];

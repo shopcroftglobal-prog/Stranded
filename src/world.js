@@ -317,6 +317,8 @@ export class World {
         put(rx - 2, ry + 2, rz - 1, B.SHIPDARK);
       }
     }
+    // villages and anything else laid over the land
+    if (this.decorate) this.decorate(this, cx, cz, (x, y, z, id) => { if (y > 0 && y < H && Math.floor(x / CS) === cx && Math.floor(z / CS) === cz) data[idx(x - cx * CS, y, z - cz * CS)] = id; });
     // the ship
     for (const [k, id] of this.structure) {
       const [x, y, z] = k.split(',').map(Number);

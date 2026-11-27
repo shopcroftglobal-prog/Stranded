@@ -125,7 +125,7 @@ export function createAdventure(G) {
     const cold = 1 + Math.max(0, -temp - 40) / 100;           // colder worlds use up air faster
     const stormy = s.storm && s.storm.on && outside() ? 2 : 1;
     if (airSource) s.air = Math.min(MAX_AIR, s.air + 30 * dt);
-    else if (!G.easy && !G.calm()) s.air = Math.max(0, s.air - (MAX_AIR / 300) * cold * stormy * G.diff().air * dt);
+    else if (!G.easy && !G.calm() && !G.fxOn('air')) s.air = Math.max(0, s.air - (MAX_AIR / 300) * cold * stormy * G.diff().air * dt);
     if (s.air <= 0) { hurtCD -= dt; if (hurtCD <= 0) { hurtCD = 1; hurt(1, 'air'); } }
     // food: about 18 minutes from full to empty (faster when you run or fight)
     if (s.food == null) s.food = MAX_FOOD;
@@ -476,7 +476,7 @@ export function createAdventure(G) {
     if (attackCD > 0) return false;
     const w = weapon();
     attackCD = 0.42;
-    const pw = 1 + 0.12 * (profile.ups && profile.ups.dmg || 0);
+    const pw = (1 + 0.12 * (profile.ups && profile.ups.dmg || 0)) * (G.fxOn('strong') ? 1.5 : 1);
     sfx.swing();
     G.swingArm();
     if (target && target.t <= (w.reach || 3.4) + (target.ent.m.userData.radius || 0)) {

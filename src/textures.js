@@ -568,6 +568,25 @@ TILES.stove = (i, j) => {
   TILES.trackSide = (i, j) => '#5a3a24';
 }
 
+// ---- potion table (Version 30)
+TILES.brewTop = (i, j) => {
+  if (i === 0 || j === 0 || i === 15 || j === 15) return '#5a3a24';
+  const b = [[4, 4, '#ff5a7a'], [11, 5, '#7ad8ff'], [7, 11, '#8aff7a']];
+  for (const [a, c, col] of b) { const d = Math.hypot(i - a, j - c); if (d < 1.6) return [col, col]; if (d < 2.4) return '#e8f0f4'; }
+  return pick(['#8a5a34', '#7a5030', '#946440'], hash(i, Math.floor(j / 3), 190));
+};
+TILES.brew = (i, j) => {
+  if (j < 2) return '#5a3a24';
+  if (j < 4) return pick(['#8a5a34', '#7a5030'], hash(i, j, 191));
+  if ((i === 1 || i === 14) && j < 15) return '#5a3a24';
+  if (j >= 7 && j <= 12 && i >= 4 && i <= 11) {                // a shelf of bottles
+    const col = ['#ff5a7a', '#7ad8ff', '#8aff7a', '#b07aff'][Math.floor((i - 4) / 2)];
+    if (j === 7) return '#e8f0f4';
+    return (i % 2 === 0) ? [col, col] : '#2c2f36';
+  }
+  return j === 15 ? '#3a2414' : pick(['#3a2a22', '#33241e'], hash(i, j, 192));
+};
+
 export const TILE_NAMES = Object.keys(TILES);
 export const ATLAS_COLS = 8;
 const ROWS = Math.ceil(TILE_NAMES.length / ATLAS_COLS);
@@ -837,6 +856,12 @@ export function itemIcon(id) {
     case 'oldcan':
       R('#6a6e73', 5, 3, 6, 11); R('#9aa0a8', 5, 3, 6, 1); R('#8a3a2a', 5, 7, 6, 3); R('#4a4e53', 10, 4, 1, 9);
       break;
+    case 'bottle': case 'p_heal': case 'p_speed': case 'p_jump': case 'p_strong': case 'p_air': case 'p_night': {
+      const col = { bottle: null, p_heal: '#ff5a7a', p_speed: '#7ad8ff', p_jump: '#8aff7a', p_strong: '#ff8a3a', p_air: '#e8f4ff', p_night: '#b07aff' }[id];
+      R('#8a5a34', 7, 1, 2, 2); R('#c8e0ec', 6, 3, 4, 3); R('#c8e0ec', 4, 6, 8, 8); R('#e8f4ff', 5, 6, 1, 6);
+      if (col) { R(col, 5, 8, 6, 5); R('#ffffff', 6, 9, 1, 2); }
+      R('#6a8a9a', 4, 14, 8, 1);
+      break; }
     default:
       R('#ff00ff', 0, 0, 16, 16);
   }

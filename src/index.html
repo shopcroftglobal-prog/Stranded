@@ -193,7 +193,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
 #bars .bar i { position: absolute; inset: 0; width: 100%; display: block; }
 #hpFill { background: #e0503a; } #hpFill.low { background: #ff2a1a; animation: blink 0.6s infinite; }
 #foodFill { background: #e8a23a; } #foodFill.low { background: #ff6a2a; animation: blink 0.6s infinite; }
-#modeTag { font-weight: bold; } .mt-c { color: #7ae0a0; } .mt-h { color: #ff6a5a; } .mt-easy { color: #9ad0ff; } .mt-hard { color: #ffb060; }
+#fxTag { color: #9ad8ff; } #modeTag { font-weight: bold; } .mt-c { color: #7ae0a0; } .mt-h { color: #ff6a5a; } .mt-easy { color: #9ad0ff; } .mt-hard { color: #ffb060; }
 .slot.can { cursor: pointer; } .slot.can:hover { outline: 2px solid var(--ok); }
 .sub.tiny { font-size: 11px; grid-column: 1 / -1; margin: 4px 0 0; }
 #modeRow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 8px 0 2px; }
@@ -403,7 +403,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <div id="tool"></div>
   <div id="hotbar"></div>
   <div id="bars" class="panel"><span>Health</span><div class="bar"><i id="hpFill"></i></div><span>Air</span><div class="bar"><i id="airFill"></i></div><span>Food</span><div class="bar"><i id="foodFill"></i></div>
-    <div class="meta"><span id="daytime"></span><span id="modeTag"></span><span id="coins"></span></div><div id="lvBox"><b id="lvNum">Lv 1</b><div class="xpbar"><div id="lvFill"></div></div><button id="prizeBtn" title="Prizes (R)">Prizes</button></div><div id="homeTag" class="hide"></div></div>
+    <div class="meta"><span id="daytime"></span><span id="fxTag"></span><span id="modeTag"></span><span id="coins"></span></div><div id="lvBox"><b id="lvNum">Lv 1</b><div class="xpbar"><div id="lvFill"></div></div><button id="prizeBtn" title="Prizes (R)">Prizes</button></div><div id="homeTag" class="hide"></div></div>
   <div id="waveBox" class="panel hide"></div>
   <div id="lostBox" class="panel hide"></div>
   <div id="banner" class="hide"></div>
@@ -540,6 +540,17 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <h2>Forge</h2>
   <p class="sub">Weapons and shields. You keep them on every world.</p>
   <div class="recipes" id="forgeList"></div>
+</div></div>
+<div id="villagePanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close</button>
+  <h2 id="villageTitle">Villager</h2>
+  <div id="villageBody"></div>
+</div></div>
+<div id="brewPanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close</button>
+  <h2>Potion table</h2>
+  <p class="sub">Each potion needs a Bottle (make them in your bag). Hold a potion and Use to drink it. You get the bottle back.</p>
+  <div class="recipes" id="brewList"></div>
 </div></div>
 <div id="stovePanel" class="overlay hide"><div class="dialog panel">
   <button class="close" data-close>Close</button>

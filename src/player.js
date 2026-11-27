@@ -40,7 +40,7 @@ export class Player {
   update(dt, input) {
     const ev = {};
     const p = this.pos, v = this.vel;
-    const sp = this.rover ? 15 * this.phys.walk : (input.run ? RUN : WALK) * this.phys.walk;
+    const sp = this.rover ? 15 * this.phys.walk : (input.run ? RUN : WALK) * this.phys.walk * (this.speedMul || 1);
     if (this.rover) { this.yaw -= input.r * 2.2 * dt; input = { ...input, r: 0, jump: false }; }
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
     // forward is -z when yaw = 0
@@ -61,7 +61,7 @@ export class Player {
     if (swim) { /* handled above */ } else if (this.fly) {
       v.y = (input.jump ? 8 : 0) - (input.down ? 8 : 0);
     } else {
-      if (input.jump && this.onGround) { v.y = this.phys.jump; this.onGround = false; ev.jumped = true; }
+      if (input.jump && this.onGround) { v.y = this.phys.jump * (this.jumpMul || 1); this.onGround = false; ev.jumped = true; }
       // climbing: hold Jump against a wall to climb up it (so a deep hole is never a trap)
       else if (input.jump && !this.rover && this.touchingWall()) { v.y = Math.max(v.y, 5.5); ev.climbing = true; }
       v.y = Math.max(v.y - this.phys.gravity * dt, -30);

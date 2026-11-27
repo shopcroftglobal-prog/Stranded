@@ -37,6 +37,9 @@ import { createAdventure, MAX_HP, MAX_AIR, LAST_WAVE, STAGES, stageOf, DRAGONS, 
 import { profile, loadProfile, saveProfile, note, wavesOn, waveMode, waveKey, WORLD_ORDER } from './profile.js';
 import { createFarm, MAX_FOOD } from './farm.js';
 import { createMachines } from './machines.js';
+import { createVillages, decorate as decorateVillages, JOBS as VJOBS } from './villages.js';
+import { createHerd } from './herd.js';
+import { BREW_RECIPES, FX_NAMES } from './blocks.js';
 import { STARS, starOf, fuelFor, canFly, UPGRADES, ENGINE_NAMES, TANK_SIZE, ENGINE_NEED } from './starmap.js';
 import { ENEMIES, BIG } from './enemies.js';
 import { placeRig, removeRig, rigAt, accrue, accrueAll, markSeen, rigSlots, rigCount, rigList, FREE_RIGS, RIG_SLOT_COINS, RIG_MINUTES, RIG_CAP, RIG_TREASURE, FIRST_LUCKY, nextFindIn, adsLeft, adBoost, boostLeft, AD_HOURS } from './rigs.js';
@@ -224,6 +227,8 @@ function applyLook(id) {
 function setupWorld(save, arriving = false) {
   if (world) for (const c of world.chunks.values()) if (c.mesh) { scene.remove(c.mesh); c.mesh.geometry.dispose(); }
   world = new World(look, inCamp ? 777 : undefined);
+  if (!inCamp) world.decorate = decorateVillages;
+  if (typeof vill !== 'undefined') { vill.clear(); herd.clear(); }
   if (inCamp || team) { const set0 = world.set.bind(world); world.set = (x, y, z, id, rec = true) => { set0(x, y, z, id, rec); if (rec && friends) friends.blockChanged(x, y, z, id); }; }
   state = save ? Object.assign(freshState(), save.state) : freshState();
   homeLv = 0; homeT = 0;
@@ -357,7 +362,7 @@ function toast(text, item) {
 function give(item, n = 1, quiet = false) {
   state.inv[item] = has(item) + n;
   if (!state.order.includes(item)) state.order.push(item);
-  if ((ITEMS[item].block || ITEMS[item].food || ITEMS[item].seed || ITEMS[item].hold) && !state.hotbar.includes(item)) {
+  if ((ITEMS[item].block || ITEMS[item].food || ITEMS[item].seed || ITEMS[item].hold || ITEMS[item].drink) && !state.hotbar.includes(item)) {
     const i = state.hotbar.indexOf(null);
     if (i >= 0) state.hotbar[i] = item;
   }
@@ -560,7 +565,7 @@ function renderBag() {
   for (const k of owned) {
     const s = document.createElement('div'); s.className = 'slot'; s.title = ITEMS[k].name;
     s.innerHTML = `<img src="${icon(k)}" alt=""><span class="n">${creative() && has(k) >= 999 ? '∞' : has(k)}</span>`;
-    if (ITEMS[k].block || ITEMS[k].food || ITEMS[k].seed || ITEMS[k].hold) { s.classList.add('can'); s.onclick = () => hold(k); }
+    if (ITEMS[k].block || ITEMS[k].food || ITEMS[k].seed || ITEMS[k].hold || ITEMS[k].drink) { s.classList.add('can'); s.onclick = () => hold(k); }
     inv.appendChild(s);
   }
   if (owned.length) { const p = document.createElement('p'); p.className = 'sub tiny'; p.textContent = 'Tap a block or some food to hold it in the slot you picked.'; inv.appendChild(p); }
@@ -605,6 +610,35 @@ function renderBag() {
 
 const NOT_IN_CREATIVE = new Set(['rig', 'trophy', 'flag']);
 const CREATIVE_BLOCKS = () => Object.keys(ITEMS).filter(k => (ITEMS[k].hold || (ITEMS[k].block && !BLOCKS[ITEMS[k].block].ship)) && !NOT_IN_CREATIVE.has(k));
+// ---- potions: drink one for a few minutes of something special
+function drink(item) {
+  const it = ITEMS[item];
+  take(item, 1); give('bottle', 1, true); sfx.catch(); G.track('potion');
+  if (it.drink === 'heal') { adv.heal(14); toast('You drank a Healing potion. Health up!'); return; }
+  state.fx = state.fx || {};
+  state.fx[it.drink] = Math.max(state.fx[it.drink] || 0, 0) + it.secs;
+  toast(`You drank a ${it.name}! ${FX_NAMES[it.drink]} for ${Math.round(state.fx[it.drink] / 60)} minutes.`);
+  note(look.planet.id, item);
+}
+function updateFx(dt) {
+  const fx = state.fx || {};
+  if (!panelOpen()) for (const k in fx) { if (fx[k] > 0) { fx[k] -= dt; if (fx[k] <= 0) { delete fx[k]; toast(`${FX_NAMES[k]} wore off.`); } } }
+  player.speedMul = fx.speed > 0 ? 1.5 : 1;
+  player.jumpMul = fx.jump > 0 ? 1.45 : 1;
+  if (fx.night > 0) { amb.intensity = Math.max(amb.intensity, 1.3); nightCover.material.opacity *= 0.25; }
+}
+function renderBrew() {
+  const el = $('brewList'); el.innerHTML = '';
+  for (const r of BREW_RECIPES) {
+    const ok = canMake(r), it = ITEMS[r.out];
+    const row = document.createElement('div'); row.className = 'recipe';
+    const needs = Object.entries(r.need).map(([k, n]) => `<span class="${has(k) >= n ? 'have' : 'miss'}">${ITEMS[k].name} ${Math.min(has(k), n)}/${n}</span>`).join(' · ');
+    row.innerHTML = `<img src="${icon(r.out)}" alt=""><div><div class="nm">${it.name}</div><div class="needs">${needs}</div><div class="note">${r.note}</div></div>`;
+    const b = document.createElement('button'); b.textContent = 'Make'; b.disabled = !ok;
+    b.onclick = () => { if (!canMake(r)) return; for (const [k, n] of Object.entries(r.need)) take(k, n); give(r.out, 1, true); sfx.craft(); G.track('brew'); toast(`Made a ${it.name}. Hold it and Use to drink it.`); renderBrew(); writeSave(); };
+    row.appendChild(b); el.appendChild(row);
+  }
+}
 // ---------------- ship ----------------
 function nearShip() { return camera.position.distanceTo(SHIP_CENTER) < 9; }
 function renderShip() {
@@ -685,6 +719,8 @@ const G = {
   heal: (n) => adv.heal(n), icon: (k) => icon(k),
   creatures: () => adv.enemies.map(e => e.pos), waterLevel: () => (water ? water.level : null), addCoins: (n) => { profile.coins += n; saveProfile(); },
   held: () => state.hotbar[state.sel], handPos: () => ({ x: player.pos.x - Math.sin(player.yaw) * 0.6 + Math.cos(player.yaw) * 0.35, y: player.pos.y + 1.3, z: player.pos.z - Math.cos(player.yaw) * 0.6 - Math.sin(player.yaw) * 0.35 }),
+  coins: () => profile.coins, fxOn: (k) => !!(state.fx && state.fx[k] > 0),
+  hearts: (x, y, z) => bits.burst(x - 0.5, y - 0.5, z - 0.5, [new THREE.Color(0xff6a9a), new THREE.Color(0xffb0cc)]),
   touch: TOUCH, splash: (x, y, z) => bits.burst(x - 0.5, y - 0.3, z - 0.5, [new THREE.Color(0x9ad8f0), new THREE.Color(0xffffff)]),
   track: (ev, n) => { if (creative()) return; if (quests) quests.track(ev, n); if (hooks) hooks.addXP(ev, n); if (ev === 'dragon') unlockSuit('dragon', 'You beat a dragon!'); },
   home: () => ({ at: !!state.flag && atHome(state, player.pos), lv: homeLv, flag: state.flag, inside: (x, z) => !!state.flag && Math.abs(x - state.flag.x - 0.5) <= HOME_R + 0.5 && Math.abs(z - state.flag.z - 0.5) <= HOME_R + 0.5 }),
@@ -694,6 +730,8 @@ let swingT = 0;
 const adv = createAdventure(G);
 const farm = createFarm(G);
 const mach = createMachines(G);
+const vill = createVillages(G);
+const herd = createHerd(G);
 
 function banner(title, sub) {
   const b = $('banner');
@@ -1335,7 +1373,7 @@ function renderBook() {
 
 // ---------------- panels and pointer lock ----------------
 let dragMode = false, lockFails = 0;
-const panels = ['stovePanel', 'prizePanel', 'teamPanel', 'setPanel', 'chatPanel', 'giftPanel', 'buildPanel', 'homePanel', 'adPanel', 'rigPanel', 'bag', 'shipPanel', 'pause', 'win', 'title', 'beaconPanel', 'forgePanel', 'boxPanel', 'shopPanel', 'mapPanel', 'bookPanel', 'fallPanel', 'rewardPanel', 'travel'];
+const panels = ['villagePanel', 'brewPanel', 'stovePanel', 'prizePanel', 'teamPanel', 'setPanel', 'chatPanel', 'giftPanel', 'buildPanel', 'homePanel', 'adPanel', 'rigPanel', 'bag', 'shipPanel', 'pause', 'win', 'title', 'beaconPanel', 'forgePanel', 'boxPanel', 'shopPanel', 'mapPanel', 'bookPanel', 'fallPanel', 'rewardPanel', 'travel'];
 const panelOpen = () => panels.some(id => !$(id).classList.contains('hide'));
 function requestLock() {
   if (dragMode) return;
@@ -1368,6 +1406,8 @@ function openPanel(id) {
   if (id === 'forgePanel') renderForge();
   if (id === 'boxPanel') renderBox();
   if (id === 'stovePanel') farm.renderStove($('stoveList'));
+  if (id === 'villagePanel') vill.render($('villageBody'), $('villageTitle'));
+  if (id === 'brewPanel') renderBrew();
   if (id === 'shopPanel') renderShop();
   if (id === 'mapPanel') renderMap();
   if (id === 'bookPanel') renderBook();
@@ -1697,6 +1737,14 @@ function useAction() {
   const fr = (inCamp || team) && friends.friendAt(rayO, fwd, rayT0 + 4);
   if (fr && rayT0) fr.t -= rayT0;
   if (fr && (!hit || fr.t < hit.t)) { openGift(fr.o); return; }
+  const vp = vill.pick(rayO, fwd, rayT0 + 4.5);
+  if (vp && (!hit || vp.t - rayT0 < hit.t) && (!aim || vp.t - rayT0 < aim.t)) { vill.talk(vp.p); return; }
+  const hp = herd.pick(rayO, fwd, rayT0 + 4.5);
+  if (hp && (!hit || hp.t - rayT0 < hit.t) && (!aim || hp.t - rayT0 < aim.t)) { herd.feed(hp.a, state.hotbar[state.sel]); writeSave(); return; }
+  if (aim && aim.kind === 'find' && aim.t < 4 && (!hit || aim.t < hit.t) && !creative() && !inCamp) {
+    const h = state.hotbar[state.sel];
+    if (h && has(h) > 0 && herd.FAVOURITE[aim.ent.kind] === h && herd.tame(aim.ent, h)) { adv.removeFind(aim.ent); writeSave(); return; }
+  }
   if (aim && (!hit || aim.t < hit.t)) {
     if (creative() && aim.kind !== 'enemy') { toast('In Creative mode the Trader and friendly finds have nothing for you. Play in Survival for rewards.'); return; }
     if (aim.kind === 'trader') { openPanel('shopPanel'); return; }
@@ -1707,6 +1755,7 @@ function useAction() {
   // farming: plant a seed on Farm soil, or pick a ripe plant
   if (held0 && has(held0) > 0 && ITEMS[held0].seed && farm.tryPlant(held0, hit)) { writeSave(); return; }
   if (hit && BLOCKS[hit.id].crop && hit.t < 5) { farm.useCrop(hit); writeSave(); return; }
+  if (held0 && has(held0) > 0 && ITEMS[held0].drink && !(hit && BLOCKS[hit.id].use)) { drink(held0); writeSave(); return; }
   if (held0 && has(held0) > 0 && ITEMS[held0].food && !(hit && BLOCKS[hit.id].use)) {
     if (ITEMS[held0].seed && hit && hit.id === B.SOIL) { toast('Aim at the top of the Farm soil to plant it.'); return; }
     farm.eat(held0); writeSave(); return;
@@ -1721,6 +1770,7 @@ function useAction() {
   if (use === 'beacon') { openPanel('beaconPanel'); return; }
   if (use === 'stove') { openPanel('stovePanel'); return; }
   if (use === 'switch') { mach.toggleSwitch(hit); return; }
+  if (use === 'brew') { openPanel('brewPanel'); return; }
   if (use === 'forge') { openPanel('forgePanel'); return; }
   if (use === 'box') { openBox = `${hit.x},${hit.y},${hit.z}`; openPanel('boxPanel'); return; }
   if (use === 'rig' && creative()) { toast('Mining rigs only dig in Survival.'); return; }
@@ -1850,7 +1900,15 @@ function frame(filmDt, noDraw) {
   let frAim = (inCamp || team) && playing && friends.friendAt(rayO, fwd, rayT0 + 4);
   if (frAim && rayT0) frAim.t -= rayT0;
   updateBody(dt);
-  if (frAim && (!hit || frAim.t < hit.t)) {
+  const vAim = playing ? vill.pick(rayO, fwd, rayT0 + 4.5) : null, hAim = playing && !vAim ? herd.pick(rayO, fwd, rayT0 + 4.5) : null;
+  if (vAim && (!hit || vAim.t - rayT0 < hit.t)) {
+    outline.visible = false;
+    $('target').textContent = `${vAim.p.name} the ${VJOBS[vAim.p.job].name} · ${TOUCH ? 'tap Use' : 'right click'} to trade`;
+  } else if (hAim && (!hit || hAim.t - rayT0 < hit.t)) {
+    outline.visible = false;
+    const a = hAim.a;
+    $('target').textContent = `Your ${FINDS[a.kind].name}${a.baby ? ' (baby)' : ''}${a.love ? ' ♥' : ''} · feed it ${ITEMS[herd.FAVOURITE[a.kind]].name.toLowerCase()}`;
+  } else if (frAim && (!hit || frAim.t < hit.t)) {
     outline.visible = false;
     $('target').textContent = `${frAim.o.name || 'A friend'} · right click (or Use) to give a gift`;
   } else if (aim && (!hit || aim.t < hit.t)) {
@@ -1858,7 +1916,7 @@ function frame(filmDt, noDraw) {
     const e = aim.ent;
     if (aim.kind === 'enemy') $('target').innerHTML = `${e.name} <span class="hpbar"><i style="width:${Math.max(0, e.hp / e.max * 100)}%"></i></span>`;
     else if (aim.kind === 'trader') $('target').innerHTML = says('Trader · right click to trade');
-    else $('target').innerHTML = `${FINDS[e.kind].name}${e.gold ? ' (golden!)' : ''} · ${FINDS[e.kind].fly ? 'stand under it' : 'walk up to it'}`;
+    else $('target').innerHTML = `${FINDS[e.kind].name}${e.gold ? ' (golden!)' : ''} · ${FINDS[e.kind].fly ? 'stand under it' : 'walk up to it'}${state.hotbar[state.sel] === herd.FAVOURITE[e.kind] ? ', or Use to tame it' : ''}`;
   } else if (hit) {
     outline.visible = true; outline.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
     const b = BLOCKS[hit.id];
@@ -1904,7 +1962,7 @@ function frame(filmDt, noDraw) {
 
   // light, sky, day and night, waves, finds
   adv.update(dt);
-  if (playing) { updateHome(dt); farm.update(dt); mach.update(dt); if (!creative() && !inCamp) farm.hungerTips(); }
+  if (playing) { updateHome(dt); farm.update(dt); mach.update(dt); vill.update(dt); if (!inCamp) herd.update(dt); updateFx(dt); if (!creative() && !inCamp) farm.hungerTips(); }
   sky.position.copy(camera.position);
   lavaSea.update(dt, camera.position);
   updateLooks(dt);
@@ -1964,6 +2022,8 @@ function renderStatus() {
   $('foodFill').style.width = `${food / MAX_FOOD * 100}%`;
   $('foodFill').classList.toggle('low', food < 5);
   const tag = creative() ? 'Creative' : hardcore() ? 'Hardcore' : profile.diff !== 'normal' && !inCamp ? diff().name : '';
+  const fxs = Object.entries(state.fx || {}).filter(([, v]) => v > 0).map(([k, v]) => `${FX_NAMES[k]} ${Math.floor(v / 60)}:${String(Math.floor(v % 60)).padStart(2, '0')}`);
+  $('fxTag').textContent = fxs.join(' · ');
   $('modeTag').textContent = tag; $('modeTag').className = tag ? 'mt-' + (creative() ? 'c' : hardcore() ? 'h' : profile.diff) : '';
   document.body.classList.toggle('creative', creative());
   $('hpFill').classList.toggle('low', state.hp < 6);
@@ -2738,5 +2798,5 @@ window.__game = {
   pending: () => updateChunks(50), landOn, get look() { return look; },
   hit: () => hit, mouse, keys, tch, TOUCH, dig, useAction, renderGoal, get launchT() { return launchT; },
   adv, race, friends, get chat() { return chat; }, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, frame, stepNow, findNear, canMake, RECIPES, ITEMS, PARTS, nearShip, SHIP_CENTER, SHIP_BASE, get playing() { return playing; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; }, get treasures() { return treasures; }, sparkle, get digPh() { return digPh; }, renderForge, renderMap, finalSteps,
-  farm, get mode() { return mode; }, setMode: (m) => { mode = m; waveMode.s = m === 'hc' ? '_hc' : ''; renderWorlds(); }, realStart: () => start(), mach, get water() { return water; }, gameOver, renderBag, renderSettings, get gameIsOver() { return gameIsOver; }, B, BLOCKS,
+  farm, get mode() { return mode; }, setMode: (m) => { mode = m; waveMode.s = m === 'hc' ? '_hc' : ''; renderWorlds(); }, realStart: () => start(), mach, vill, herd, drink, get hitNow() { return hit; }, get water() { return water; }, gameOver, renderBag, renderSettings, get gameIsOver() { return gameIsOver; }, B, BLOCKS,
 };

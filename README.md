@@ -254,3 +254,11 @@ Each new place is based on a real place on Mars:
 - **Fishing rod**: Use on the sea (TRAPPIST-1e, LHS 1140 b, Blue world) or on the top of ice (Europa, Glass world). Wait for the bite, then Use again within about a second and a half. Raw fish, coins, seeds, sometimes a Gem or a golden fish, or an Old can.
 - **Boat**: hold it and Use on open water. W to sail, A/D to turn, Jump to step off onto the nearest land.
 - Code: src/machines.js, `low` blocks (thin, on the ground) in src/world.js. Test: test/machines.js (add `phone`).
+
+## Version 30: villages, potions, taming and breeding
+- **Villages**: small settlements of other stranded pilots, on every world. The first one on each world is a short walk north-east of the ship; more appear further out. Each has a well, lamp posts, a farm and four houses with a bed and a work block. A banner shows the village name the first time you find it.
+- **Villagers**: five per village, each with a job: Farmer, Cook, Smith, Potion maker, Miner. Use on a villager to trade (coins or goods). After 10 trades you are a friend of the village and coin prices are 10% lower.
+- **Potion table** (bag, needs Bottles made from Ice and Purple crystal): Healing, Speed, Jump, Strength, Air and Night potions. Hold a potion and Use to drink it; the bottle comes back. The running effect shows next to the bars.
+- **Taming**: hold a friendly creature's favourite food (e.g. Lettuce for hoppers and bunnies, Beans for crabs, Raw fish for jellies) and Use on it. It goes to live at your home (Home flag, else bed, else the ship). Up to 12.
+- **Breeding**: feed two tamed creatures of the same kind their favourite food within 30 seconds and a baby comes. It grows up in about 5 minutes. Grown-ups bring you small presents while you are home.
+- Code: src/villages.js, src/herd.js, potions in src/main.js (drink, updateFx). Test: test/village.js (add `phone`).
