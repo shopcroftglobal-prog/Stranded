@@ -271,3 +271,6 @@ Each new place is based on a real place on Mars:
 
 ## Version 32: softer music
 - The background music was too sharp. It is now only soft sine tones (no buzzy triangle waves), played lower, through a warm low filter and a gentle echo. The tune steps between nearby notes instead of jumping to high bell notes, and it is quieter overall (src/audio.js).
+
+## Version 33: unlock everything, updated
+- Settings (Esc, then Settings) > "Unlock everything" now also opens the three Andromeda worlds (fits the Galaxy drive), gives every suit, and gives enough minerals plus 2 Antimatter cells to try the whole final mission.
