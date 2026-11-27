@@ -188,10 +188,17 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
 }
 .touch #title .btns { position: sticky; bottom: -18px; margin: 10px -20px -18px; padding: 10px; background: #1a0c09; border-top: 1px solid var(--edge); z-index: 1; }
 /* ---------- adventure ---------- */
-#bars { position: absolute; top: 46px; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: auto 120px auto 120px; gap: 4px 8px; align-items: center; padding: 5px 10px; font-size: 13px; }
+#bars { position: absolute; top: 46px; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: auto 100px auto 100px auto 100px; gap: 4px 8px; align-items: center; padding: 5px 10px; font-size: 13px; }
 #bars .bar { height: 10px; background: #1a0905; border: 1px solid #4a2416; position: relative; }
 #bars .bar i { position: absolute; inset: 0; width: 100%; display: block; }
 #hpFill { background: #e0503a; } #hpFill.low { background: #ff2a1a; animation: blink 0.6s infinite; }
+#foodFill { background: #e8a23a; } #foodFill.low { background: #ff6a2a; animation: blink 0.6s infinite; }
+#modeTag { font-weight: bold; } .mt-c { color: #7ae0a0; } .mt-h { color: #ff6a5a; } .mt-easy { color: #9ad0ff; } .mt-hard { color: #ffb060; }
+.slot.can { cursor: pointer; } .slot.can:hover { outline: 2px solid var(--ok); }
+.sub.tiny { font-size: 11px; grid-column: 1 / -1; margin: 4px 0 0; }
+#modeRow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 8px 0 2px; }
+#modeRow button.on { background: #2e6a4a; border-color: var(--ok); }
+#modeNote { margin: 2px 0 6px; }
 #airFill { background: #6ac8f0; } #airFill.low { background: #f0c24a; animation: blink 0.6s infinite; }
 @keyframes blink { 50% { opacity: 0.45 } }
 #bars .meta { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
@@ -362,7 +369,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
 #travelText { font-size: 30px; color: #ffd7b0; text-align: center; line-height: 1.5; animation: bannerIn 2.4s forwards; }
 .world .lk { font-size: 11px; color: var(--muted); }
 #tScan { right: calc(108px + env(safe-area-inset-right, 0px)); bottom: calc(196px + env(safe-area-inset-bottom, 0px)); width: 58px; height: 58px; font-size: 13px; }
-.touch #bars { top: auto; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); grid-template-columns: auto 70px auto 70px; font-size: 11px; padding: 3px 7px; }
+.touch #bars { top: auto; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); grid-template-columns: auto 52px auto 52px auto 52px; gap: 3px 5px; font-size: 11px; padding: 3px 7px; }
 .touch #waveBox { top: calc(8px + env(safe-area-inset-top, 0px)); font-size: 14px; }
 .touch #lostBox { top: calc(44px + env(safe-area-inset-top, 0px)); }
 @media (orientation: portrait) { #tScan { bottom: calc(222px + env(safe-area-inset-bottom, 0px)); } .touch #bars { bottom: calc(52px + env(safe-area-inset-bottom, 0px)); } }
@@ -395,8 +402,8 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <div id="guide" class="hide"></div>
   <div id="tool"></div>
   <div id="hotbar"></div>
-  <div id="bars" class="panel"><span>Health</span><div class="bar"><i id="hpFill"></i></div><span>Air</span><div class="bar"><i id="airFill"></i></div>
-    <div class="meta"><span id="daytime"></span><span id="coins"></span></div><div id="lvBox"><b id="lvNum">Lv 1</b><div class="xpbar"><div id="lvFill"></div></div><button id="prizeBtn" title="Prizes (R)">Prizes</button></div><div id="homeTag" class="hide"></div></div>
+  <div id="bars" class="panel"><span>Health</span><div class="bar"><i id="hpFill"></i></div><span>Air</span><div class="bar"><i id="airFill"></i></div><span>Food</span><div class="bar"><i id="foodFill"></i></div>
+    <div class="meta"><span id="daytime"></span><span id="modeTag"></span><span id="coins"></span></div><div id="lvBox"><b id="lvNum">Lv 1</b><div class="xpbar"><div id="lvFill"></div></div><button id="prizeBtn" title="Prizes (R)">Prizes</button></div><div id="homeTag" class="hide"></div></div>
   <div id="waveBox" class="panel hide"></div>
   <div id="lostBox" class="panel hide"></div>
   <div id="banner" class="hide"></div>
@@ -427,6 +434,8 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
       <div id="worlds"></div>
       <div id="facts"></div>
     </div>
+    <div id="modeRow"><span class="sub" style="margin:0">Way to play:</span><button data-mode="normal">Survival</button><button data-mode="creative">Creative</button><button data-mode="hc">Hardcore</button></div>
+    <p class="sub" id="modeNote"></p>
     <div class="btns">
       <button id="playBtn">Play</button>
       <button id="newBtn" class="hide">Start over</button>
@@ -474,7 +483,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
     <p class="sub" id="bagTool"></p>
     <div class="bag">
       <div><h4>What you have</h4><div class="inv" id="inv"></div></div>
-      <div><h4>Make</h4><div class="recipes" id="recipes"></div></div>
+      <div><h4 id="makeHead">Make</h4><div class="recipes" id="recipes"></div></div>
     </div>
   </div>
 </div>
@@ -531,6 +540,12 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <h2>Forge</h2>
   <p class="sub">Weapons and shields. You keep them on every world.</p>
   <div class="recipes" id="forgeList"></div>
+</div></div>
+<div id="stovePanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close</button>
+  <h2>Camp stove</h2>
+  <p class="sub">Cooked food fills you up much more than raw food. Grow potatoes, beans and lettuce on Farm soil.</p>
+  <div class="recipes" id="stoveList"></div>
 </div></div>
 <div id="boxPanel" class="overlay hide"><div class="dialog panel">
   <button class="close" data-close>Close</button>

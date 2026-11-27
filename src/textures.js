@@ -450,6 +450,74 @@ for (const [c, , hex] of COLOURS) {
   for (const f of ['wall_', 'bricks_', 'roof_', 'glass_', 'banner_']) TILES[f + c] = glow(TILES[f + c]);
 }
 
+// ---- farming and cooking (Version 28)
+TILES.soilTop = (i, j) => {
+  if ((j % 4 === 1)) return pick(['#2a160e', '#24120a'], hash(i, j, 140));                 // furrows
+  return pick(['#5a3420', '#4e2c1a', '#653c26', '#47281a'], hash(i, j, 141));
+};
+TILES.soilSide = (i, j) => (j < 3 ? pick(['#5a3420', '#4e2c1a', '#653c26'], hash(i, j, 142)) : TILES.dust(i, j));
+TILES.stoveTop = (i, j) => {
+  const e = i === 0 || j === 0 || i === 15 || j === 15;
+  if (e) return '#3a3e45';
+  const d = Math.hypot(i - 7.5, j - 7.5);
+  if (d < 2.2) return ['#ffd060', '#ffb030'];
+  if (d < 4.2) return (Math.floor(Math.atan2(j - 7.5, i - 7.5) * 3) % 2) ? ['#ff6a2a', '#e04a10'] : '#2c2f36';
+  if (d < 5.2) return '#1a1c21';
+  return pick(['#5c6068', '#535860', '#666b73'], hash(i, j, 143));
+};
+TILES.stove = (i, j) => {
+  if (j < 2) return '#3a3e45';
+  if (j >= 6 && j <= 11 && i >= 4 && i <= 11) {                     // the little window with the fire
+    if (j === 6 || j === 11 || i === 4 || i === 11) return '#1a1c21';
+    return hash(i, j, 144) > 0.5 ? ['#ff8a3a', '#ff6a1a'] : ['#ffd060', '#ffb030'];
+  }
+  if (j === 14 || j === 15) return '#2c2f36';
+  return pick(['#877b75', '#958a84', '#7a6e68'], hash(Math.floor(i / 3), Math.floor(j / 2), 145));
+};
+{
+  const G = ['#3e9a3e', '#4aae46', '#2e7a34', '#5ac05a'];
+  const g = (i, j, s) => pick(G, hash(i, j, s));
+  const stem = (i, j, x, top) => i === x && j >= top;
+  // a sprout: two little leaves on a short stem
+  const sprout = (i, j, x, s) => (stem(i, j, x, 12) || (j === 11 && (i === x - 1 || i === x + 1)) || (j === 10 && (i === x - 2 || i === x + 2))) ? g(i, j, s) : null;
+  const sprouts = (i, j, s) => sprout(i, j, 4, s) || sprout(i, j, 11, s + 1);
+  // a leafy bush that fills more of the picture as it grows
+  const bush = (i, j, h, s) => {
+    const cx = 7.5, w = (15 - j) * 0.5 + 1.5;
+    if (j < 15 - h) return null;
+    if (Math.abs(i - cx) > w + (hash(i, j, s) - 0.5) * 2) return null;
+    if (hash(i, j, s + 3) > 0.82) return null;                         // gaps between leaves
+    return g(i, j, s + 5);
+  };
+  TILES.crop_potato_0 = (i, j) => sprouts(i, j, 150);
+  TILES.crop_potato_1 = (i, j) => bush(i, j, 8, 151);
+  TILES.crop_potato_2 = (i, j) => {
+    if (j >= 13 && ((i >= 2 && i <= 5) || (i >= 9 && i <= 12)) && !(j === 13 && (i === 2 || i === 5 || i === 9 || i === 12))) return pick(['#b8864a', '#a87a40', '#c8965a'], hash(i, j, 152));  // potatoes in the ground
+    if ((i === 4 && j === 3) || (i === 10 && j === 2) || (i === 7 && j === 5)) return ['#ffffff', '#c8a0ff'];      // little white flowers
+    if ((i === 5 && j === 3) || (i === 11 && j === 2)) return '#ffe060';
+    return j < 13 ? bush(i, j, 12, 153) : null;
+  };
+  // beans climb a stick
+  const pole = (i, j) => (i === 7 || i === 8) && j >= 1 ? (i === 7 ? '#8a6a3a' : '#6a4e2a') : null;
+  TILES.crop_bean_0 = (i, j) => sprouts(i, j, 160);
+  TILES.crop_bean_1 = (i, j) => pole(i, j) || ((j >= 6 && Math.abs(i - 7.5) < 3.5 && hash(i, j, 161) > 0.45) ? g(i, j, 162) : null);
+  TILES.crop_bean_2 = (i, j) => {
+    if (((i === 4 || i === 11) && j >= 5 && j <= 10) || ((i === 5 || i === 10) && j >= 6 && j <= 11)) return (j % 3 === 0) ? '#8ad84a' : '#6ac03a';   // bean pods
+    return pole(i, j) || ((j >= 2 && Math.abs(i - 7.5) < 5 && hash(i, j, 163) > 0.4) ? g(i, j, 164) : null);
+  };
+  // lettuce: a round head of red and green leaves
+  const head = (i, j, r, s) => {
+    const d = Math.hypot(i - 7.5, (j - 14) * 1.2);
+    if (d > r) return null;
+    const red = hash(Math.floor(i / 2), Math.floor(j / 2), s) > 0.55;
+    if (d > r - 1.2) return red ? '#8a2a3a' : '#2e7a34';
+    return red ? pick(['#b8405a', '#a83450'], hash(i, j, s + 1)) : pick(['#6ac860', '#5ab850', '#8ad878'], hash(i, j, s + 2));
+  };
+  TILES.crop_lettuce_0 = (i, j) => sprouts(i, j, 170);
+  TILES.crop_lettuce_1 = (i, j) => head(i, j, 4.5, 171);
+  TILES.crop_lettuce_2 = (i, j) => head(i, j, 8, 172);
+}
+
 export const TILE_NAMES = Object.keys(TILES);
 export const ATLAS_COLS = 8;
 const ROWS = Math.ceil(TILE_NAMES.length / ATLAS_COLS);
@@ -672,6 +740,37 @@ export function itemIcon(id) {
       break;
     case 'antimatter':
       R('#2a2e34', 4, 0, 8, 16); R('#aeb3b8', 4, 0, 8, 2); R('#aeb3b8', 4, 14, 8, 2); R('#ff3aa0', 5, 3, 6, 10); R('#ffd0f0', 7, 5, 2, 6); R('#ffffff', 7, 7, 2, 2);
+      break;
+    // food (Version 28)
+    case 'potato': case 'bakedpotato':
+      R(id === 'potato' ? '#7a5430' : '#6a3a1a', 3, 5, 10, 8); R(id === 'potato' ? '#b8864a' : '#a0582a', 3, 4, 10, 8); R(id === 'potato' ? '#d0a060' : '#c87a3a', 4, 5, 4, 2);
+      R('#6a4422', 6, 8, 1, 1); R('#6a4422', 10, 6, 1, 1); R('#6a4422', 9, 10, 1, 1);
+      if (id === 'bakedpotato') { R('#fff0a0', 6, 3, 5, 2); R('#ffd060', 7, 2, 3, 1); R('#ffffff', 8, 0, 1, 2); }
+      break;
+    case 'beanseed': case 'lettuceseed':
+      R('#c8b48a', 3, 2, 10, 12); R('#e8d8b0', 3, 2, 10, 1); R('#8a7a5a', 3, 13, 10, 1);
+      R(id === 'beanseed' ? '#4aae46' : '#b8405a', 5, 5, 6, 5); R(id === 'beanseed' ? '#8ad84a' : '#6ac860', 6, 6, 2, 2);
+      R('#5a3a24', 5, 11, 1, 1); R('#5a3a24', 8, 11, 1, 1); R('#5a3a24', 10, 11, 1, 1);
+      break;
+    case 'beans':
+      for (let k = 0; k < 3; k++) { R('#3e9a3e', 2 + k * 4, 2 + k * 2, 3, 10); R('#6ac03a', 3 + k * 4, 2 + k * 2, 1, 9); R('#8ad84a', 3 + k * 4, 4 + k * 2, 1, 1); R('#8ad84a', 3 + k * 4, 8 + k * 2, 1, 1); }
+      break;
+    case 'lettuce':
+      R('#2e7a34', 2, 4, 12, 10); R('#6ac860', 3, 3, 10, 10); R('#b8405a', 3, 3, 3, 4); R('#b8405a', 10, 5, 3, 4); R('#8ad878', 6, 6, 4, 4); R('#2e7a34', 7, 8, 2, 6);
+      break;
+    case 'rawfish': case 'cookedfish': {
+      const c = id === 'rawfish' ? ['#7ab8e0', '#4a88b8', '#c8e8f8'] : ['#c87a3a', '#8a4a1a', '#ffd08a'];
+      R(c[1], 2, 6, 10, 5); R(c[0], 3, 5, 8, 5); R(c[2], 4, 6, 4, 1); R(c[1], 11, 4, 3, 2); R(c[1], 11, 10, 3, 2); R(c[1], 12, 6, 2, 4); R('#1a1c21', 4, 7, 1, 1);
+      if (id === 'cookedfish') { R('#5a2a0a', 6, 8, 1, 1); R('#5a2a0a', 8, 7, 1, 1); }
+      break; }
+    case 'stew': case 'salad': {
+      R('#8a5a3a', 2, 8, 12, 6); R('#a8744a', 2, 8, 12, 1); R('#6a4428', 4, 14, 8, 1);
+      if (id === 'stew') { R('#8a4a1a', 3, 6, 10, 2); R('#6ac03a', 5, 6, 2, 1); R('#6ac03a', 9, 7, 2, 1); R('#ffffff', 6, 2, 1, 3); R('#ffffff', 9, 1, 1, 3); }
+      else { R('#6ac860', 3, 4, 10, 4); R('#b8405a', 4, 4, 3, 2); R('#8ad878', 8, 3, 3, 2); R('#4aae46', 10, 5, 2, 2); R('#b8405a', 7, 6, 2, 1); }
+      break; }
+    case 'pie':
+      R('#8a4a1a', 1, 8, 14, 6); R('#d0904a', 1, 6, 14, 3); R('#e8b060', 2, 6, 12, 1); R('#ff7ac0', 4, 7, 2, 1); R('#ff7ac0', 9, 7, 2, 1); R('#a8642a', 1, 13, 14, 1);
+      R('#ffffff', 7, 2, 1, 3); R('#ffffff', 10, 3, 1, 2);
       break;
     default:
       R('#ff00ff', 0, 0, 16, 16);

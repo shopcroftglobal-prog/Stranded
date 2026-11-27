@@ -300,3 +300,54 @@ export const recipeFor = (item) => {
   for (const f in FAMILY_ITEMS) if (FAMILY_ITEMS[f].some(([, it]) => it === item)) return { out: item, ...BUILD_COST[f] };
   return null;
 };
+// ---------------------------------------------------------------- farming and cooking (Version 28)
+// Crops grow on Farm soil. Each crop has 3 looks: just planted, growing, ripe.
+// `cross` = drawn as two crossing pictures, like a real plant.
+Object.assign(B, { SOIL: 130, STOVE: 131 });
+def(B.SOIL, { name: 'Farm soil', item: 'soil', tiles: { top: 'soilTop', side: 'soilSide', bottom: 'dust' }, time: 0.5 });
+def(B.STOVE, { name: 'Camp stove', item: 'stove', tiles: { top: 'stoveTop', side: 'stove', bottom: 'shipDark' }, time: 1.0, use: 'stove' });
+export const CROPS = {
+  potato: { name: 'Potato plant', seed: 'potato', crop: 'potato', n: [2, 4], fact: 'Real: scientists grew potatoes in soil like Mars soil in Peru, in a sealed box with Mars-like air.' },
+  bean: { name: 'Bean plant', seed: 'beanseed', crop: 'beans', n: [3, 5], fact: 'Real: beans add their own goodness to the soil, so they are a good first crop on a new world.' },
+  lettuce: { name: 'Lettuce plant', seed: 'lettuceseed', crop: 'lettuce', n: [1, 2], fact: 'Real: in 2015 astronauts on the space station ate red lettuce they grew there.' },
+};
+export const CROP_IDS = {};   // kind -> [3 block ids]
+{
+  let id = 132;
+  for (const k in CROPS) {
+    CROP_IDS[k] = [];
+    for (let s = 0; s < 3; s++) {
+      def(id, { name: s === 2 ? `${CROPS[k].name} (ripe)` : CROPS[k].name, tiles: `crop_${k}_${s}`, time: 0.15, solid: false, draw: true, see: true, cross: true, crop: { kind: k, stage: s } });
+      CROP_IDS[k].push(id++);
+    }
+  }
+}
+// `food` = how much it fills you up, `heal` = health it gives, `seed` = the crop it plants
+Object.assign(ITEMS, {
+  soil: { name: 'Farm soil', block: B.SOIL },
+  stove: { name: 'Camp stove', block: B.STOVE },
+  potato: { name: 'Potato', food: 3, seed: 'potato' },
+  beanseed: { name: 'Bean seeds', seed: 'bean' },
+  beans: { name: 'Beans', food: 2 },
+  lettuceseed: { name: 'Lettuce seeds', seed: 'lettuce' },
+  lettuce: { name: 'Lettuce', food: 3 },
+  rawfish: { name: 'Raw fish', food: 2 },
+  bakedpotato: { name: 'Baked potato', food: 7, heal: 2 },
+  stew: { name: 'Bean stew', food: 10, heal: 4 },
+  salad: { name: 'Salad', food: 8, heal: 3, air: 20 },
+  cookedfish: { name: 'Cooked fish', food: 9, heal: 4 },
+  pie: { name: 'Moss pie', food: 14, heal: 8 },
+});
+ITEMS.fruit.food = 5; ITEMS.fruit.heal = 6; ITEMS.fruit.air = 30;
+RECIPES.push(
+  { out: 'soil', n: 4, need: { dust: 3, ice: 1 }, note: 'Plant seeds or a potato on it. Ice close by makes plants grow twice as fast.' },
+  { out: 'stove', n: 1, need: { rock: 6, sheet: 1 }, note: 'Cook food on it. Cooked food fills you up much more.' },
+);
+// Cooked on the Camp stove
+export const COOK_RECIPES = [
+  { out: 'bakedpotato', n: 1, need: { potato: 1 }, note: 'Fills you up a lot more than a raw potato.' },
+  { out: 'cookedfish', n: 1, need: { rawfish: 1 }, note: 'A good hot meal.' },
+  { out: 'stew', n: 1, need: { beans: 3, ice: 1 }, note: 'Warm and filling. Heals you too.' },
+  { out: 'salad', n: 1, need: { lettuce: 2, beans: 1 }, note: 'Fresh. Fills you up and gives you a little air.' },
+  { out: 'pie', n: 1, need: { fruit: 2, potato: 1 }, note: 'The best meal there is. Fills you right up and heals a lot.' },
+];

@@ -7,7 +7,8 @@ import {
   makeHopper, makeRockCrab, makeGlowJelly, makeGemSnail, makeGoldBeetle, makeLuckyMoth,
   makeDiggerMole, makeDustPuff, makeIceFish, makeSkyRay, makeCraterBunny, makeLostRobot, makeTrader, makeBuddy, makeDragon, animate, COLOURS,
 } from './characters.js';
-import { profile, saveProfile, note, wavesOn, WORLD_POWER } from './profile.js';
+import { profile, saveProfile, note, wavesOn, waveKey, WORLD_POWER } from './profile.js';
+import { MAX_FOOD } from './farm.js';
 
 export const MAX_HP = 20, MAX_AIR = 100, LAST_WAVE = 50;
 export const STAGES = [
@@ -97,10 +98,11 @@ export function createAdventure(G) {
 
   // ---------------------------------------------------------------- health and air
   function hurt(n, why) {
-    if (S().hp <= 0 || G.godMode) return;
+    if (S().hp <= 0 || G.godMode || G.creative()) return;
     const sh = profile.gear.shield ? ITEMS[profile.gear.shield].guard : 0;
     const tough = 1 - 0.08 * (profile.ups && profile.ups.armor || 0);
-    const dmg = Math.max(0.5, n * (1 - sh) * tough);
+    const plain = why === 'air' || why === 'food';
+    const dmg = plain ? n : Math.max(0.5, n * (1 - sh) * tough * G.diff().dmg);
     S().hp = Math.max(0, S().hp - dmg);
     sinceHurt = 0; flashT = 0.35; sfx.hurt();
     if (S().hp <= 0) fall(why);
@@ -112,7 +114,7 @@ export function createAdventure(G) {
       if (w.get(Math.floor(p.x) + x, Math.floor(p.y) + y, Math.floor(p.z) + z) === id) return true;
     return false;
   }
-  let airSource = false, airCheckT = 0;
+  let airSource = false, airCheckT = 0, starveCD = 5;
   function updateAir(dt) {
     const s = S();
     if (s.air == null) s.air = MAX_AIR;
@@ -123,16 +125,25 @@ export function createAdventure(G) {
     const cold = 1 + Math.max(0, -temp - 40) / 100;           // colder worlds use up air faster
     const stormy = s.storm && s.storm.on && outside() ? 2 : 1;
     if (airSource) s.air = Math.min(MAX_AIR, s.air + 30 * dt);
-    else if (!G.easy && !G.calm()) s.air = Math.max(0, s.air - (MAX_AIR / 300) * cold * stormy * dt);
+    else if (!G.easy && !G.calm()) s.air = Math.max(0, s.air - (MAX_AIR / 300) * cold * stormy * G.diff().air * dt);
     if (s.air <= 0) { hurtCD -= dt; if (hurtCD <= 0) { hurtCD = 1; hurt(1, 'air'); } }
+    // food: about 18 minutes from full to empty (faster when you run or fight)
+    if (s.food == null) s.food = MAX_FOOD;
+    const D = G.diff();
+    if (!G.easy && !G.calm()) s.food = Math.max(0, s.food - dt * (MAX_FOOD / 1080) * D.food * (G.running() || wave ? 1.5 : 1));
+    if (s.food <= 0 && !G.calm()) {
+      starveCD -= dt;
+      if (starveCD <= 0) { starveCD = 5; if (s.hp > D.starveTo) hurt(1, 'food'); }
+    }
     sinceHurt += dt;
-    if (sinceHurt > 6 && s.air > 20 && s.hp < MAX_HP) heal(dt * 0.4 * (G.home().at && G.home().lv >= 1 ? 3 : 1));
+    if (sinceHurt > 6 && s.air > 20 && s.food >= 6 && s.hp < MAX_HP) heal(dt * 0.4 * (G.home().at && G.home().lv >= 1 ? 3 : 1) * (s.food >= 16 ? 1.5 : 1));
   }
   // You fall: your bag stays where you were, and you wake at your bed or the ship.
   function fall(why) {
     const s = S(), p = P();
+    if (G.hardcore()) { if (wave) failWave(); clearVisitors(); G.gameOver(why); return; }
     const keep = {}, lost = {};
-    for (const k in s.inv) (ITEMS[k].tool || ITEMS[k].part || k === 'scanner' ? keep : lost)[k] = s.inv[k];
+    for (const k in s.inv) (ITEMS[k].tool || ITEMS[k].part || k === 'scanner' || G.diff().keep ? keep : lost)[k] = s.inv[k];
     if (Object.keys(lost).length) {
       if (s.lost) for (const k in s.lost.inv) lost[k] = (lost[k] || 0) + s.lost.inv[k];
       s.lost = { x: p.x, y: p.y + 0.5, z: p.z, inv: lost };
@@ -140,7 +151,7 @@ export function createAdventure(G) {
     s.inv = keep; s.order = s.order.filter(k => keep[k]); s.hotbar = s.hotbar.map(k => (k && keep[k] ? k : null));
     if (wave) failWave();
     clearVisitors();
-    s.hp = MAX_HP; s.air = MAX_AIR;
+    s.hp = MAX_HP; s.air = MAX_AIR; s.food = Math.max(s.food ?? MAX_FOOD, 12);
     const home = s.home && G.world.get(s.home.x, s.home.y, s.home.z) === B.BED ? s.home : null;
     const flag = s.flag;
     if (home) Object.assign(p, { x: home.x + 0.5, y: home.y + 1, z: home.z + 0.5 });
@@ -148,7 +159,7 @@ export function createAdventure(G) {
     else Object.assign(p, { x: -9.5, y: surface(-10, 7) + 0.1, z: 7.5 });
     G.player.vel.y = 0;
     G.renderHotbar(); G.writeSave();
-    G.showFall(why === 'air' ? 'You ran out of air.' : 'You were knocked out.', !!s.lost);
+    G.showFall(why === 'air' ? 'You ran out of air.' : why === 'food' ? 'You were too hungry to go on.' : 'You were knocked out.', !!s.lost);
   }
   function updateLost(dt) {
     const s = S();
@@ -399,7 +410,7 @@ export function createAdventure(G) {
     const items = chest(n);
     if (x2 > 1) for (const k in items) items[k] *= 2;
     const lines = [];
-    if (!again) profile.waves[id] = Math.max(wavesOn(id), n);
+    if (!again) profile.waves[waveKey(id)] = Math.max(wavesOn(id), n);
     // first wave won each day pays double; every stage cleared pays a big bonus
     const today = new Date().toDateString();
     if (profile.firstWin !== today) { profile.firstWin = today; coins *= 2; lines.push('First win today: double coins!'); }
@@ -714,7 +725,7 @@ export function createAdventure(G) {
       case 'puff': G.give('fuelcell', 1, true); break;
       case 'fish':
         if (fd.gold) { profile.coins += 80; msg = 'A golden Ice fish! The Trader will pay well: +80 coins.'; note(id, 'goldfish'); }
-        else { heal(8); msg = 'You caught an Ice fish. A good meal: health up.'; }
+        else { heal(4); G.give('rawfish', 2, true); msg = 'You caught an Ice fish: +2 Raw fish. Cook them on a Camp stove for a good meal.'; }
         break;
       case 'moth': profile.wish = true; break;
       case 'beetle': G.give('gem', 1, true); break;

@@ -236,3 +236,14 @@ Each new place is based on a real place on Mars:
 - Real voice everywhere (public website, phone app) needs a small online server; on hold until Maaz says go.
 - Artifact capabilities now also: room topics `chat` and `rtc` (Contributor), db rules `reports` (write self, read owner/Editors) + `reports/{self}`, `dictation`, `tts`.
 - Test: test/chat.js (two players: typing, filter both ways, spam guard, block, report, voice connect, push to talk, nearby fade, hang up).
+
+## Version 28: food, farming, cooking, Creative mode, Hardcore and difficulty
+- **Food**: a third bar next to Health and Air. It runs down over about 18 minutes (faster when you run or fight). You only heal when you have some food, and faster when you are full. At empty you slowly lose health. The first time you get hungry you find 4 potatoes and some bean seeds in the ship's food locker.
+- **Eating**: food goes in your hotbar. Hold it and Use (right click). Tap anything in the bag to hold it in the slot you picked.
+- **Farming**: make Farm soil in the bag (3 dust + 1 ice gives 4). Hold a potato, Bean seeds or Lettuce seeds and Use on top of the soil. Plants grow in 3 steps in about 4 minutes, twice as fast with ice or frost within 2 blocks (or next to a sea), even while you are away. Use a ripe plant to pick it and plant it again; dig it to just pick it. Seeds come from old supply boxes, the Trader and ripe plants. Each crop has a real fact.
+- **Cooking**: Camp stove (6 rock + 1 metal sheet). Baked potato, Cooked fish, Bean stew, Salad, Moss pie. Ice fish now give Raw fish.
+- **Ways to play** (title screen): Survival, Creative and Hardcore, each with its own save per world.
+  - Creative: every block in the bag, as many as you like, instant digging, flying, no danger, no hunger. No rewards, waves, rigs or trading there.
+  - Hardcore: one life, always Hard. If you fall the world (and its wave count) is gone and starts again. Coins and level stay.
+- **Difficulty** (Settings): Easy (half damage, air and food last longer, hunger never knocks you out, keep your bag), Normal, Hard (1.5x damage, faster air and food, hunger can knock you out).
+- Code: src/farm.js, crops/food/stove in src/blocks.js, plant drawing (`cross` blocks) in src/world.js. Tests: test/farm.js (add `phone`), test/farmshot.js.

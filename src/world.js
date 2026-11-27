@@ -448,11 +448,26 @@ export function meshVolume(get, sx, sy, sz, sky) {
     for (let y = sy; y >= -1; y--) if (S(x, y, z)) { top[(x + 1) + (z + 1) * PX] = y; break; }
   }
   const open = (x, y, z) => (S(x, y, z) ? -1 : (!sky || y > top[(x + 1) + (z + 1) * PX]) ? 1 : 0);
+  const crossT = BLOCKS.map(b => (b && b.cross ? 1 : 0));
 
   const pos = [], nor = [], uv = [], col = [], ind = [];
   for (let y = 0; y < sy; y++) for (let z = 0; z < sz; z++) for (let x = 0; x < sx; x++) {
     const id = P[pi(x, y, z)];
     if (!solidT[id]) continue;
+    if (crossT[id]) {
+      // plants: two crossing pictures, seen from both sides
+      const [u0, v0, u1, v1] = faceUV(id, 'side');
+      const v = 0.42 + 0.58 * Math.max(0, open(x, y, z));
+      const a = 0.12, b = 0.88;
+      for (const [x0, z0, x1, z1] of [[a, a, b, b], [b, a, a, b], [b, b, a, a], [a, b, b, a]]) {
+        const base = pos.length / 3;
+        pos.push(x + x0, y, z + z0, x + x1, y, z + z1, x + x0, y + 1, z + z0, x + x1, y + 1, z + z1);
+        for (let k = 0; k < 4; k++) { nor.push(0, 1, 0); col.push(v, v, v); }
+        uv.push(u0, v0, u1, v0, u0, v1, u1, v1);
+        ind.push(base, base + 1, base + 3, base, base + 3, base + 2);
+      }
+      continue;
+    }
     for (const f of FACES) {
       const [dx, dy, dz] = f.dir;
       const nx = x + dx, ny = y + dy, nz = z + dz;
