@@ -9,37 +9,61 @@ export function initAudio() {
 }
 let sfxVol = 0.35, musicVol = 0.5, musicGain = null, musicTimer = null, mood = 'calm';
 export function setVolume(v) { sfxVol = v; if (master) master.gain.value = v; }
-// ---- music: soft, slow chords made on the fly. Each world has its own scale.
+// ---- music: soft, warm, slow pads made on the fly. Each world has its own scale.
+// Only pure sine tones, through a low filter and a soft echo, so nothing sounds sharp or buzzy.
 const SCALES = {
   calm: [0, 2, 4, 7, 9], ice: [0, 2, 3, 7, 10], warm: [0, 4, 5, 7, 11], dark: [0, 3, 5, 7, 10], race: [0, 2, 4, 5, 7, 9, 11],
 };
-export function setMusic(v) { musicVol = v; if (musicGain) musicGain.gain.value = v * 0.18; }
+const MUSIC_LEVEL = 0.13;
+export function setMusic(v) { musicVol = v; if (musicGain) musicGain.gain.value = v * MUSIC_LEVEL; }
 export function setMood(m) { mood = SCALES[m] ? m : 'calm'; }
+let musicOut = [];
 export function startMusic() {
   if (!ctx || musicTimer) return;
-  musicGain = ctx.createGain(); musicGain.gain.value = musicVol * 0.18; musicGain.connect(ctx.destination);
-  let step = 0, root = 0;
-  const pad = (freq, t, dur, gain, type = 'triangle') => {
-    const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq;
-    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + dur * 0.35); g.gain.linearRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(musicGain); o.start(t); o.stop(t + dur + 0.05);
+  const fast = mood === 'race';
+  musicGain = ctx.createGain(); musicGain.gain.value = musicVol * MUSIC_LEVEL;
+  // warm it up: cut the high, sharp part of the sound
+  const low = ctx.createBiquadFilter(); low.type = 'lowpass'; low.frequency.value = fast ? 1500 : 900; low.Q.value = 0.4;
+  // a soft echo, like a big quiet room
+  const echo = ctx.createDelay(2); echo.delayTime.value = fast ? 0.38 : 0.62;
+  const fb = ctx.createGain(); fb.gain.value = 0.32;
+  const echoLow = ctx.createBiquadFilter(); echoLow.type = 'lowpass'; echoLow.frequency.value = 600;
+  const wet = ctx.createGain(); wet.gain.value = 0.35;
+  musicGain.connect(low); low.connect(ctx.destination);
+  low.connect(echo); echo.connect(echoLow); echoLow.connect(fb); fb.connect(echo); echoLow.connect(wet); wet.connect(ctx.destination);
+  musicOut = [low, echo, fb, echoLow, wet];
+  let step = 0, root = 0, mel = 2;
+  const tone = (freq, t, dur, gain, attack) => {
+    for (const d of [-3, 3]) {   // two slightly apart sines = a soft, wide sound
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq; o.detune.value = d;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(gain / 2, t + dur * attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(musicGain); o.start(t); o.stop(t + dur + 0.05);
+    }
   };
   const play = () => {
     if (!musicVol) return;
-    const sc = SCALES[mood], t = ctx.currentTime + 0.05, fast = mood === 'race';
-    const base = fast ? 196 : 130.8;   // G3 when racing, C3 otherwise
+    const sc = SCALES[mood], t = ctx.currentTime + 0.05;
+    const base = fast ? 146.8 : 110;   // D3 when racing, A2 otherwise: low and warm
     const note = (i) => base * Math.pow(2, (sc[((i % sc.length) + sc.length) % sc.length] + 12 * Math.floor(i / sc.length)) / 12);
     if (step % 4 === 0) root = [0, 3, 4, 2][(step / 4) % 4];
-    const len = fast ? 1.6 : 4.2;
-    if (step % 2 === 0) { pad(note(root), t, len * 2, 0.5, 'sine'); pad(note(root + 2), t, len * 2, 0.32); pad(note(root + 4), t, len * 2, 0.26); }
-    // a few gentle bell notes on top
-    for (let k = 0; k < (fast ? 4 : 2); k++) if (Math.random() < 0.7) pad(note(root + 5 + Math.floor(Math.random() * 5)) * 2, t + k * len / (fast ? 4 : 2), len * 0.8, 0.12, 'sine');
+    const len = fast ? 1.6 : 4.6;
+    if (step % 2 === 0) { tone(note(root) / 2, t, len * 2.2, 0.55, 0.4); tone(note(root), t, len * 2.2, 0.4, 0.45); tone(note(root + 2), t, len * 2.2, 0.26, 0.5); tone(note(root + 4), t, len * 2.2, 0.2, 0.5); }
+    // a quiet tune that only steps to the next note up or down, never jumps
+    const n = fast ? 4 : 2;
+    for (let k = 0; k < n; k++) {
+      if (Math.random() < (fast ? 0.8 : 0.55)) {
+        mel = Math.max(3, Math.min(9, mel + [-1, 0, 1][Math.floor(Math.random() * 3)]));
+        tone(note(root + mel), t + k * len / n, len * 1.1, fast ? 0.16 : 0.13, 0.12);
+      }
+    }
     step++;
   };
   play();
-  musicTimer = setInterval(() => play(), mood === 'race' ? 1600 : 4200);
+  musicTimer = setInterval(() => play(), fast ? 1600 : 4600);
 }
-export function restartMusic() { if (musicTimer) { clearInterval(musicTimer); musicTimer = null; if (musicGain) musicGain.disconnect(); musicGain = null; } startMusic(); }
+export function restartMusic() { if (musicTimer) { clearInterval(musicTimer); musicTimer = null; if (musicGain) musicGain.disconnect(); musicGain = null; for (const n of musicOut) n.disconnect(); musicOut = []; } startMusic(); }
 
 function noise(dur, freq, q, gain, type = 'bandpass') {
   if (!ctx) return;

@@ -268,3 +268,6 @@ Each new place is based on a real place on Mars:
 - **Map** (M, or the Map button on phones): the ground you have explored on this world, seen from above, with you, the ship, your home, bed, villages you found and your signs. Closer/Further to zoom. The map is saved with the world and grows as you travel.
 - **Slingshot** (bag: 1 Metal sheet + 1 Iron, or from a village Smith): hold it and Use to shoot Rock at monsters from far away. Each shot uses 1 Rock.
 - Code: src/signs.js, src/landmap.js, src/sling.js. Test: test/signs.js (add `phone`).
+
+## Version 32: softer music
+- The background music was too sharp. It is now only soft sine tones (no buzzy triangle waves), played lower, through a warm low filter and a gentle echo. The tune steps between nearby notes instead of jumping to high bell notes, and it is quieter overall (src/audio.js).
