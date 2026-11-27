@@ -424,3 +424,14 @@ export const BREW_RECIPES = [
   { out: 'p_air', n: 1, need: { bottle: 1, ice: 4, crystal: 1 }, note: 'Your air does not run down, for 3 minutes.' },
   { out: 'p_night', n: 1, need: { bottle: 1, rawfish: 2, crystal: 1 }, note: 'See in the dark, for 4 minutes.' },
 ];
+// ---------------------------------------------------------------- signs and slingshot (Version 31)
+B.SIGN = 156;
+def(B.SIGN, { name: 'Sign', item: 'sign', tiles: { top: 'signTop', side: 'sign', bottom: 'signTop' }, time: 0.6, use: 'sign' });
+Object.assign(ITEMS, {
+  sign: { name: 'Sign', block: B.SIGN },
+  sling: { name: 'Slingshot', hold: true },
+});
+RECIPES.push(
+  { out: 'sign', n: 2, need: { sheet: 1 }, note: 'Place it, then write a few words on it. Everyone near it can read them.' },
+  { out: 'sling', n: 1, need: { sheet: 1, iron: 1 }, note: 'Hold it and Use to shoot Rock at monsters from far away. Each shot uses 1 Rock.', once: true },
+);

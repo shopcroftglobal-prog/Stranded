@@ -262,3 +262,9 @@ Each new place is based on a real place on Mars:
 - **Taming**: hold a friendly creature's favourite food (e.g. Lettuce for hoppers and bunnies, Beans for crabs, Raw fish for jellies) and Use on it. It goes to live at your home (Home flag, else bed, else the ship). Up to 12.
 - **Breeding**: feed two tamed creatures of the same kind their favourite food within 30 seconds and a baby comes. It grows up in about 5 minutes. Grown-ups bring you small presents while you are home.
 - Code: src/villages.js, src/herd.js, potions in src/main.js (drink, updateFx). Test: test/village.js (add `phone`).
+
+## Version 31: signs, map and slingshot
+- **Sign** (bag: 1 Metal sheet makes 2): place it and write up to 40 letters on it. The words float above the sign for anyone near. Use it again to change the words. Rude words and links are hidden.
+- **Map** (M, or the Map button on phones): the ground you have explored on this world, seen from above, with you, the ship, your home, bed, villages you found and your signs. Closer/Further to zoom. The map is saved with the world and grows as you travel.
+- **Slingshot** (bag: 1 Metal sheet + 1 Iron, or from a village Smith): hold it and Use to shoot Rock at monsters from far away. Each shot uses 1 Rock.
+- Code: src/signs.js, src/landmap.js, src/sling.js. Test: test/signs.js (add `phone`).

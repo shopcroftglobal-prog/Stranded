@@ -39,6 +39,9 @@ import { createFarm, MAX_FOOD } from './farm.js';
 import { createMachines } from './machines.js';
 import { createVillages, decorate as decorateVillages, JOBS as VJOBS } from './villages.js';
 import { createHerd } from './herd.js';
+import { createSigns } from './signs.js';
+import { createLandMap } from './landmap.js';
+import { createSling } from './sling.js';
 import { BREW_RECIPES, FX_NAMES } from './blocks.js';
 import { STARS, starOf, fuelFor, canFly, UPGRADES, ENGINE_NAMES, TANK_SIZE, ENGINE_NEED } from './starmap.js';
 import { ENEMIES, BIG } from './enemies.js';
@@ -228,7 +231,7 @@ function setupWorld(save, arriving = false) {
   if (world) for (const c of world.chunks.values()) if (c.mesh) { scene.remove(c.mesh); c.mesh.geometry.dispose(); }
   world = new World(look, inCamp ? 777 : undefined);
   if (!inCamp) world.decorate = decorateVillages;
-  if (typeof vill !== 'undefined') { vill.clear(); herd.clear(); }
+  if (typeof vill !== 'undefined') { vill.clear(); herd.clear(); signs.clear(); sling.clear(); }
   if (inCamp || team) { const set0 = world.set.bind(world); world.set = (x, y, z, id, rec = true) => { set0(x, y, z, id, rec); if (rec && friends) friends.blockChanged(x, y, z, id); }; }
   state = save ? Object.assign(freshState(), save.state) : freshState();
   homeLv = 0; homeT = 0;
@@ -707,7 +710,7 @@ let shakeAmt = 0;
 const G = {
   THREE, scene, camera, sfx, Cloud, bits, flames, smoke, sun, hemi, amb, nightCover,
   get world() { return world; }, get player() { return player; }, get state() { return state; }, get look() { return look; }, get sky() { return sky; },
-  shipCenter: SHIP_CENTER, give, take, has, toast: (t) => toast(says(t)), renderHotbar, writeSave,
+  shipCenter: SHIP_CENTER, saveKey: () => SAVE_KEY, give, take, has, toast: (t) => toast(says(t)), renderHotbar, writeSave,
   nearShip: () => nearShip(), covered: () => covered(), active: () => playing && !panelOpen() && launchT < 0,
   openPanel: (id) => openPanel(id), closePanels: () => closePanels(), shake: (a) => { shakeAmt = Math.max(shakeAmt, a); },
   swingArm: () => { swingT = 0.3; },
@@ -732,6 +735,10 @@ const farm = createFarm(G);
 const mach = createMachines(G);
 const vill = createVillages(G);
 const herd = createHerd(G);
+const signs = createSigns(G);
+const land = createLandMap(G);
+const sling = createSling(G, adv);
+function renderLand() { land.render($('landCanvas')); $('landSub').textContent = `The ground you have explored on ${look.planet.name}. North is up. Showing ${Math.round(256 / land.zoom)} by ${Math.round(256 / land.zoom)} blocks.`; }
 
 function banner(title, sub) {
   const b = $('banner');
@@ -767,7 +774,7 @@ function gameOver(why) {
   const id = look.planet.id, st = state.stats, m = Math.floor(st.time / 60);
   const waves = wavesOn(id);
   delete profile.waves[waveKey(id)]; saveProfile();
-  try { localStorage.removeItem(SAVE_KEY); } catch (e) { }
+  try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(SAVE_KEY + '-map'); } catch (e) { }
   gameIsOver = true; playing = false;
   if (player) player.fly = false;
   $('hud').classList.add('hide'); $('touch').classList.remove('on');
@@ -1373,7 +1380,7 @@ function renderBook() {
 
 // ---------------- panels and pointer lock ----------------
 let dragMode = false, lockFails = 0;
-const panels = ['villagePanel', 'brewPanel', 'stovePanel', 'prizePanel', 'teamPanel', 'setPanel', 'chatPanel', 'giftPanel', 'buildPanel', 'homePanel', 'adPanel', 'rigPanel', 'bag', 'shipPanel', 'pause', 'win', 'title', 'beaconPanel', 'forgePanel', 'boxPanel', 'shopPanel', 'mapPanel', 'bookPanel', 'fallPanel', 'rewardPanel', 'travel'];
+const panels = ['signPanel', 'landPanel', 'villagePanel', 'brewPanel', 'stovePanel', 'prizePanel', 'teamPanel', 'setPanel', 'chatPanel', 'giftPanel', 'buildPanel', 'homePanel', 'adPanel', 'rigPanel', 'bag', 'shipPanel', 'pause', 'win', 'title', 'beaconPanel', 'forgePanel', 'boxPanel', 'shopPanel', 'mapPanel', 'bookPanel', 'fallPanel', 'rewardPanel', 'travel'];
 const panelOpen = () => panels.some(id => !$(id).classList.contains('hide'));
 function requestLock() {
   if (dragMode) return;
@@ -1408,6 +1415,7 @@ function openPanel(id) {
   if (id === 'stovePanel') farm.renderStove($('stoveList'));
   if (id === 'villagePanel') vill.render($('villageBody'), $('villageTitle'));
   if (id === 'brewPanel') renderBrew();
+  if (id === 'landPanel') renderLand();
   if (id === 'shopPanel') renderShop();
   if (id === 'mapPanel') renderMap();
   if (id === 'bookPanel') renderBook();
@@ -1423,6 +1431,7 @@ function openPanel(id) {
 }
 function closePanels(relock = true) {
   for (const p of panels) $(p).classList.add('hide');
+  if (document.activeElement && document.activeElement.id === 'signText') document.activeElement.blur();
   if (relock) resume();
 }
 function resume() {
@@ -1436,7 +1445,7 @@ $('stayBtn').onclick = landAgain;
 $('resumeBtn').onclick = () => resume();
 $('restartBtn').onclick = () => {
   if (!confirmRestart()) return;
-  try { localStorage.removeItem(SAVE_KEY); } catch (e) { }
+  try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(SAVE_KEY + '-map'); } catch (e) { }
   setupWorld(null); resume();
 };
 let restartArmed = 0;
@@ -1460,6 +1469,8 @@ const turn = (dx, dy) => {
 window.addEventListener('keydown', (e) => {
   if (!playing) return;
   if (chat && chat.typing) return;
+  if (e.target && e.target.id === 'signText') { if (e.code === 'Enter') signs.save(); else if (e.code === 'Escape') closePanels(); return; }
+  if (e.code === 'KeyM' && launchT < 0) { if (!$('landPanel').classList.contains('hide')) closePanels(); else if (!panelOpen()) openPanel('landPanel'); return; }
   if (e.code === 'Escape') {
     if (dragMode || !document.pointerLockElement) {
       if (panelOpen()) { if (!$('win').classList.contains('hide')) return; closePanels(); } else openPanel('pause');
@@ -1612,6 +1623,7 @@ function setupTouch() {
   hold('tPlace', () => useAction(), () => { });
   const tap = (id, fn) => $(id).addEventListener('click', (e) => { e.preventDefault(); initAudio(); fn(); });
   tap('tBag', () => { if (launchT < 0) openPanel('bag'); });
+  tap('tMap', () => { if (launchT < 0) openPanel('landPanel'); });
   tap('tShip', () => { if (launchT >= 0) return; if (nearShip()) openPanel('shipPanel'); else findShip(); });
   tap('tPause', () => openPanel('pause'));
   tap('tBook', () => { if (launchT < 0) openPanel('bookPanel'); });
@@ -1679,6 +1691,7 @@ function updateDig(dt) {
     dig.on = false; dig.p = 0; crackBox.visible = false; writeSave(); return;
   }
   if (dig.p >= 1 && BLOCKS[hit.id].power) mach.removed(hit.x, hit.y, hit.z);
+  if (dig.p >= 1 && hit.id === B.SIGN) signs.removed(hit.x, hit.y, hit.z);
   if (dig.p >= 1 && BLOCKS[hit.id].low === undefined && BLOCKS[world.get(hit.x, hit.y + 1, hit.z)].low) {
     // a wire or track on top falls off with the block under it
     const up = world.get(hit.x, hit.y + 1, hit.z); world.set(hit.x, hit.y + 1, hit.z, B.AIR); mach.removed(hit.x, hit.y + 1, hit.z);
@@ -1733,6 +1746,7 @@ function useAction() {
       if (h === 'rod') { mach.useRod(rayO, fwd, hit); return; }
       if (h === 'boat') { mach.startBoat(rayO, fwd); return; }
       if (h === 'cart') { mach.startCart(hit); return; }
+      if (h === 'sling') { sling.shoot(rayO, fwd); return; }
     } }
   const fr = (inCamp || team) && friends.friendAt(rayO, fwd, rayT0 + 4);
   if (fr && rayT0) fr.t -= rayT0;
@@ -1771,6 +1785,7 @@ function useAction() {
   if (use === 'stove') { openPanel('stovePanel'); return; }
   if (use === 'switch') { mach.toggleSwitch(hit); return; }
   if (use === 'brew') { openPanel('brewPanel'); return; }
+  if (use === 'sign') { signs.open(hit.x, hit.y, hit.z); return; }
   if (use === 'forge') { openPanel('forgePanel'); return; }
   if (use === 'box') { openBox = `${hit.x},${hit.y},${hit.z}`; openPanel('boxPanel'); return; }
   if (use === 'rig' && creative()) { toast('Mining rigs only dig in Survival.'); return; }
@@ -1808,6 +1823,7 @@ function useAction() {
   world.set(x, y, z, pid);
   mach.placed(x, y, z, pid);
   take(item, 1);
+  if (pid === B.SIGN) { sfx.place(); signs.open(x, y, z); state.stats.placed++; G.track('place'); return; }
   if (item === 'flag') {
     const moved = !!state.flag;
     state.flag = { x, y, z, name: (state.flag && state.flag.name) || '' };
@@ -1962,7 +1978,7 @@ function frame(filmDt, noDraw) {
 
   // light, sky, day and night, waves, finds
   adv.update(dt);
-  if (playing) { updateHome(dt); farm.update(dt); mach.update(dt); vill.update(dt); if (!inCamp) herd.update(dt); updateFx(dt); if (!creative() && !inCamp) farm.hungerTips(); }
+  if (playing) { updateHome(dt); farm.update(dt); mach.update(dt); vill.update(dt); if (!inCamp) herd.update(dt); signs.update(dt); sling.update(dt); if (!inCamp && !team) land.update(dt); updateFx(dt); if (!creative() && !inCamp) farm.hungerTips(); }
   sky.position.copy(camera.position);
   lavaSea.update(dt, camera.position);
   updateLooks(dt);
@@ -2121,7 +2137,7 @@ document.querySelectorAll('#modeRow button').forEach(b => b.onclick = () => {
   renderWorlds();
 });
 function landOn(id, fresh) {
-  if (fresh) try { localStorage.removeItem(saveKey(id)); } catch (e) { }
+  if (fresh) try { localStorage.removeItem(saveKey(id)); localStorage.removeItem(saveKey(id) + '-map'); } catch (e) { }
   applyLook(id);
   setupWorld(fresh ? null : loadSave());
 }
@@ -2420,6 +2436,11 @@ function renderMission() {
   el.innerHTML = `<b>${head}</b><span>${says(txt)}</span>`;
 }
 $('findBtn').onclick = () => findShip();
+$('mapBtnL').onclick = () => { if (launchT < 0) openPanel('landPanel'); };
+$('signSave').onclick = () => signs.save();
+$('signText').addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); signs.save(); } else if (e.key === 'Escape') closePanels(); });
+$('landIn').onclick = () => { land.zoomBy(1); renderLand(); };
+$('landOut').onclick = () => { land.zoomBy(-1); renderLand(); };
 if (TOUCH) $('findBtn').textContent = 'Find ship';
 function backToTop() {
   if (!playing || groundAbove() < 2) { toast('You are already at the top.'); return; }
@@ -2792,6 +2813,7 @@ if (FILM) frame(); else requestAnimationFrame(frame);
 
 // hooks for automated testing and screenshots
 window.__game = {
+  signs, land, sling,
   get world() { return world; }, get player() { return player; }, get state() { return state; },
   THREE, scene, camera, renderer, give, make: (out) => make(RECIPES.find(r => r.out === out)), install, launch, landAgain, openPanel, closePanels: () => closePanels(false),
   start: () => { playing = true; $('hud').classList.remove('hide'); $('touch').classList.add('on'); for (const p of panels) $(p).classList.add('hide'); renderHotbar(); renderGoal(); },

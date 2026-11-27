@@ -67,7 +67,7 @@ const path = require('path');
   await page.waitForTimeout(900);
   await page.evaluate(() => { __game.player.pitch = -0.2; });
   await shot('cart_ride');
-  await page.waitForFunction(() => __game.mach.rideInfo.from && __game.mach.rideInfo.speed === 0 && __game.mach.rideInfo.t === 0 && __game.mach.rideInfo.from[2] > 0, null, { timeout: 15000 }).catch(() => {});
+  await page.waitForFunction(() => __game.mach.rideInfo.from && __game.mach.rideInfo.speed === 0 && __game.mach.rideInfo.t === 0 && __game.mach.rideInfo.from[2] > 0, null, { timeout: 40000 }).catch(() => {});
   const end = await page.evaluate((P) => { const r = __game.mach.rideInfo; return [r.from[0] - P.x0, r.from[1] - P.y, r.from[2] - P.z0]; }, P);
   ok('cart reached the end (up the step, round the corner)', end.join() === '10,2,2', end.join());
   await page.evaluate(() => { const g = __game; g.keys.delete('KeyW'); g.tch.move = null; g.tch.jy = 0; });

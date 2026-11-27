@@ -879,7 +879,7 @@ export function createAdventure(G) {
   }
 
   return {
-    update, reset, attack, pick, scan, startWave, canStart, sleep, hurt, heal, catchFind,
+    update, reset, attack, strike, pick, scan, startWave, canStart, sleep, hurt, heal, catchFind,
     sunDir, get daylight() { return daylight; }, isDark, get camps() { return camps; }, campSoon: () => { campT = 0; },
     get wave() { return wave; }, get enemies() { return enemies; }, get finds() { return finds; },
     get flash() { return flashT; }, weapon, spawnEnemy, spawnFind,

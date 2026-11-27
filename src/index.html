@@ -106,6 +106,10 @@ details.help summary { cursor: pointer; }
 .bag h4 { margin: 0 0 8px; color: #ffd7b0; font-weight: 400; font-size: 17px; }
 .inv { display: grid; grid-template-columns: repeat(auto-fill, 58px); gap: 4px; }
 .inv .slot { cursor: default; pointer-events: auto; }
+.signRow { display: flex; gap: 8px; } .signRow input { flex: 1; min-width: 0; font: inherit; font-size: 18px; padding: 8px 10px; background: #1c1410; color: #fff4dc; border: 2px solid #7d838c; }
+.landDlg { width: min(560px, 100%); } #landCanvas { display: block; width: min(512px, 100%, calc(100vh - 210px)); aspect-ratio: 1; margin: 6px auto; image-rendering: pixelated; border: 3px solid #4a4e56; }
+.landRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .landKey { font-size: 13px; opacity: 0.9; } .landKey i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 3px 0 8px; border: 1px solid #1c1410; }
+#mapBtnL { position: absolute; top: 124px; right: 12px; padding: 7px 12px; font-size: 14px; z-index: 6; pointer-events: auto; } .touch #mapBtnL { display: none; }
 .recipes { display: flex; flex-direction: column; gap: 6px; }
 .recipe { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; background: rgba(60,25,14,0.35); border: 1px solid #4a2416; }
 .recipe img { width: 40px; height: 40px; image-rendering: pixelated; }
@@ -394,6 +398,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <div id="depth" class="panel"></div>
   <button id="upBtn" class="hide">⬆ Back to the top (U)</button>
   <button id="findBtn">Find ship (N)</button>
+  <button id="mapBtnL">Map (M)</button>
   <div id="mission" class="panel hide"></div>
   <div id="toasts"></div>
   <div id="hint"></div>
@@ -418,7 +423,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <button class="tbtn" id="tScan">Scan</button>
   <button class="tbtn" id="tRover">Drive</button>
   <button class="tbtn" id="tTalk">Talk</button>
-  <div id="tmenu"><button id="tBag">Bag</button><button id="tBook">Book</button><button id="tChat">Say</button><button id="tFly">Fly</button><button id="tView">View</button><button id="tPrize">Prizes</button><button id="tShop">Shop</button><button id="tShip" class="far">Ship</button><button id="tPause">II</button></div>
+  <div id="tmenu"><button id="tBag">Bag</button><button id="tBook">Book</button><button id="tChat">Say</button><button id="tFly">Fly</button><button id="tView">View</button><button id="tPrize">Prizes</button><button id="tShop">Shop</button><button id="tMap">Map</button><button id="tShip" class="far">Ship</button><button id="tPause">II</button></div>
 </div>
 
 <div id="voiceBar" class="hide"></div>
@@ -545,6 +550,20 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <button class="close" data-close>Close</button>
   <h2 id="villageTitle">Villager</h2>
   <div id="villageBody"></div>
+</div></div>
+<div id="signPanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close</button>
+  <h2>Write on the sign</h2>
+  <p class="sub">Up to 40 letters. Everyone near the sign can read it. Rude words and links are hidden.</p>
+  <div class="signRow"><input id="signText" maxlength="40" autocomplete="off" placeholder="Like: Farm this way"><button id="signSave">Save</button></div>
+</div></div>
+<div id="landPanel" class="overlay hide"><div class="dialog panel landDlg">
+  <button class="close" data-close>Close</button>
+  <h2>Map</h2>
+  <p class="sub" id="landSub">The ground you have explored. North is up.</p>
+  <canvas id="landCanvas" width="256" height="256"></canvas>
+  <div class="landRow"><button id="landIn">Closer</button><button id="landOut">Further</button>
+  <span class="landKey"><i style="background:#fff"></i>You <i style="background:#ff7a4a"></i>Ship <i style="background:#8aff7a"></i>Home <i style="background:#7ad8ff"></i>Bed <i style="background:#ffc04a"></i>Village <i style="background:#e8dcc0"></i>Sign</span></div>
 </div></div>
 <div id="brewPanel" class="overlay hide"><div class="dialog panel">
   <button class="close" data-close>Close</button>

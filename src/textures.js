@@ -587,6 +587,17 @@ TILES.brew = (i, j) => {
   return j === 15 ? '#3a2414' : pick(['#3a2a22', '#33241e'], hash(i, j, 192));
 };
 
+// a sign: a light board with dark writing lines, in a metal frame (Version 31)
+TILES.sign = (i, j) => {
+  if (i === 0 || j === 0 || i === 15 || j === 15) return '#4a4e56';
+  if (i === 1 || j === 1 || i === 14 || j === 14) return '#7d838c';
+  if ((j === 4 || j === 7 || j === 10) && i >= 3 && i <= 12 - (j % 3) * 2) return hash(i, j, 230) > 0.25 ? '#3a2c24' : '#e8dcc0';
+  return pick(['#e8dcc0', '#e0d2b4', '#efe4cc'], hash(i, j, 231));
+};
+TILES.signTop = (i, j) => {
+  if (i === 0 || j === 0 || i === 15 || j === 15) return '#4a4e56';
+  return pick(['#7d838c', '#737981', '#868c94'], hash(i, Math.floor(j / 2), 232));
+};
 export const TILE_NAMES = Object.keys(TILES);
 export const ATLAS_COLS = 8;
 const ROWS = Math.ceil(TILE_NAMES.length / ATLAS_COLS);
@@ -862,6 +873,10 @@ export function itemIcon(id) {
       if (col) { R(col, 5, 8, 6, 5); R('#ffffff', 6, 9, 1, 2); }
       R('#6a8a9a', 4, 14, 8, 1);
       break; }
+    case 'sling':
+      R('#7a5234', 7, 8, 2, 7); R('#7a5234', 4, 3, 2, 6); R('#7a5234', 10, 3, 2, 6); R('#5a3a24', 5, 8, 6, 2);
+      R('#c4562a', 5, 3, 1, 1); R('#c4562a', 10, 3, 1, 1); R('#3a2c24', 6, 4, 4, 1); R('#8a8e96', 7, 4, 2, 2);
+      break;
     default:
       R('#ff00ff', 0, 0, 16, 16);
   }

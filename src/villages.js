@@ -19,7 +19,7 @@ export const JOBS = {
     { give: { rawfish: 3 }, get: { coins: 9 } }, { give: { rawfish: 2, potato: 1 }, get: { cookedfish: 2 } }] },
   smith: { name: 'Smith', says: 'I can make anything out of metal.', trades: [
     { give: { iron: 4 }, get: { sheet: 3 } }, { give: { coins: 30 }, get: { rod: 1 } }, { give: { coins: 60 }, get: { cart: 1 } },
-    { give: { coins: 15 }, get: { track: 8 } }, { give: { coins: 50 }, get: { boat: 1 } }, { give: { gold: 2 }, get: { coins: 45 } }] },
+    { give: { coins: 15 }, get: { track: 8 } }, { give: { coins: 50 }, get: { boat: 1 } }, { give: { gold: 2 }, get: { coins: 45 } }, { give: { coins: 25 }, get: { sling: 1 } }, { give: { coins: 10 }, get: { sign: 4 } }] },
   potions: { name: 'Potion maker', says: 'A little bottle can do a lot.', trades: [
     { give: { coins: 8 }, get: { bottle: 3 } }, { give: { coins: 25 }, get: { p_heal: 1 } }, { give: { coins: 30 }, get: { p_speed: 1 } },
     { give: { coins: 30 }, get: { p_jump: 1 } }, { give: { coins: 40 }, get: { p_air: 1 } }, { give: { fruit: 3 }, get: { p_heal: 1 } }] },
