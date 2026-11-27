@@ -143,7 +143,7 @@ export function createAdventure(G) {
     const s = S(), p = P();
     if (G.hardcore()) { if (wave) failWave(); clearVisitors(); G.gameOver(why); return; }
     const keep = {}, lost = {};
-    for (const k in s.inv) (ITEMS[k].tool || ITEMS[k].part || k === 'scanner' || G.diff().keep ? keep : lost)[k] = s.inv[k];
+    for (const k in s.inv) (ITEMS[k].tool || ITEMS[k].part || ITEMS[k].hold || k === 'scanner' || G.diff().keep ? keep : lost)[k] = s.inv[k];
     if (Object.keys(lost).length) {
       if (s.lost) for (const k in s.lost.inv) lost[k] = (lost[k] || 0) + s.lost.inv[k];
       s.lost = { x: p.x, y: p.y + 0.5, z: p.z, inv: lost };

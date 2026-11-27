@@ -449,6 +449,7 @@ export function meshVolume(get, sx, sy, sz, sky) {
   }
   const open = (x, y, z) => (S(x, y, z) ? -1 : (!sky || y > top[(x + 1) + (z + 1) * PX]) ? 1 : 0);
   const crossT = BLOCKS.map(b => (b && b.cross ? 1 : 0));
+  const lowT = BLOCKS.map(b => (b && b.low) || 0);
 
   const pos = [], nor = [], uv = [], col = [], ind = [];
   for (let y = 0; y < sy; y++) for (let z = 0; z < sz; z++) for (let x = 0; x < sx; x++) {
@@ -466,6 +467,17 @@ export function meshVolume(get, sx, sy, sz, sky) {
         uv.push(u0, v0, u1, v0, u0, v1, u1, v1);
         ind.push(base, base + 1, base + 3, base, base + 3, base + 2);
       }
+      continue;
+    }
+    if (lowT[id]) {
+      // thin things lying on the ground: wire, tracks, step plates
+      const hgt = lowT[id], v = 0.42 + 0.58 * Math.max(0, open(x, y, z));
+      const [u0, v0, u1, v1] = faceUV(id, 'top');
+      let base = pos.length / 3;
+      pos.push(x, y + hgt, z + 1, x + 1, y + hgt, z + 1, x, y + hgt, z, x + 1, y + hgt, z);
+      for (let k = 0; k < 4; k++) { nor.push(0, 1, 0); col.push(v, v, v); }
+      uv.push(u0, v0, u1, v0, u0, v1, u1, v1);
+      ind.push(base, base + 1, base + 3, base, base + 3, base + 2);
       continue;
     }
     for (const f of FACES) {

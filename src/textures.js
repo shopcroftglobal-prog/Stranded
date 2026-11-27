@@ -518,6 +518,56 @@ TILES.stove = (i, j) => {
   TILES.crop_lettuce_2 = (i, j) => head(i, j, 8, 172);
 }
 
+// ---- wiring and tracks (Version 29)
+{
+  const plateT = (on) => (i, j) => (i === 0 || j === 0 || i === 15 || j === 15) ? '#3a3e45' : (i === 1 || j === 1) ? '#c9cdd2' : on ? pick(['#7d838c', '#737980'], hash(i, j, 180)) : pick(['#a7abb0', '#9a9ea3'], hash(i, j, 181));
+  TILES.plate = plateT(false); TILES.plateOn = plateT(true);
+  const wireT = (on) => (i, j) => {
+    const line = (i >= 6 && i <= 9) || (j >= 6 && j <= 9);
+    if (!line) return null;
+    const core = (i === 7 || i === 8) || (j === 7 || j === 8);
+    if (on) return core ? ['#ff6a4a', '#ff3a1a'] : ['#c0301a', '#a01a0a'];
+    return core ? '#8a3a2a' : '#5a2418';
+  };
+  TILES.wire = wireT(false); TILES.wireOn = wireT(true);
+  const switchT = (on) => (i, j) => {
+    if (i === 0 || j === 0 || i === 15 || j === 15) return '#3a3e45';
+    if (i >= 5 && i <= 10 && j >= 9 && j <= 13) return '#2c2f36';                        // the base
+    const lx = on ? 7 + Math.round((9 - j) * 0.5) : 7 - Math.round((9 - j) * 0.5);       // the lever leans left (off) or right (on)
+    if (j >= 3 && j < 9 && (i === lx || i === lx + 1)) return '#aeb3b8';
+    if (j >= 1 && j < 3 && Math.abs(i - (on ? 10 : 4.5)) < 1.6) return on ? ['#6aff9a', '#30d060'] : '#c43a3a';
+    return pick(['#7d838c', '#737980', '#868c94'], hash(i, j, 182));
+  };
+  TILES.switchOff = switchT(false); TILES.switchOn = switchT(true);
+  const lampT = (on) => (i, j) => {
+    const e = i < 2 || j < 2 || i > 13 || j > 13;
+    if (e) return (i + j) % 4 === 0 ? '#2c2f36' : '#454a54';
+    const d = Math.max(Math.abs(i - 7.5), Math.abs(j - 7.5));
+    if (!on) return d < 2 ? '#8a7a50' : pick(['#5a5040', '#4e4636'], hash(i, j, 183));
+    return d < 2 ? ['#ffffff', '#ffffff'] : d < 4 ? ['#ffe890', '#ffd060'] : ['#ffc040', '#e8a020'];
+  };
+  TILES.wlamp = lampT(false); TILES.wlampOn = lampT(true);
+  const blinkT = (on) => (i, j) => {
+    if (i === 0 || j === 0 || i === 15 || j === 15) return '#2c2f36';
+    const d = Math.hypot(i - 7.5, j - 7.5);
+    if (d < 3.2) return on ? ['#6affe0', '#30e0c0'] : '#1a4a44';
+    if (d < 4.2) return '#1a1c21';
+    return (i + j) % 6 === 0 ? '#5c6068' : '#454a54';
+  };
+  TILES.blinker = blinkT(false); TILES.blinkerOn = blinkT(true);
+  // tracks: two rails on wooden ties. `x` runs east to west.
+  const trackT = (fast, x) => (a, b) => {
+    const i = x ? b : a, j = x ? a : b;            // i across the track, j along it
+    if (i === 3 || i === 12) return fast ? ['#ffd060', '#c09020'] : '#aeb3b8';
+    if (i === 4 || i === 11) return '#5c6068';
+    if (fast && i >= 6 && i <= 9 && (j % 5 === 1 || j % 5 === 2) && Math.abs(i - 7.5) <= 2.5 - (j % 5 === 2 ? 1 : 0)) return ['#ff8a3a', '#ff6a1a'];  // arrows
+    if (j % 4 === 1 || j % 4 === 2) return pick(['#7a5234', '#6a4428', '#845a3a'], hash(i, j, 184));
+    return null;
+  };
+  TILES.track = trackT(false, false); TILES.trackX = trackT(false, true); TILES.fast = trackT(true, false); TILES.fastX = trackT(true, true);
+  TILES.trackSide = (i, j) => '#5a3a24';
+}
+
 export const TILE_NAMES = Object.keys(TILES);
 export const ATLAS_COLS = 8;
 const ROWS = Math.ceil(TILE_NAMES.length / ATLAS_COLS);
@@ -771,6 +821,21 @@ export function itemIcon(id) {
     case 'pie':
       R('#8a4a1a', 1, 8, 14, 6); R('#d0904a', 1, 6, 14, 3); R('#e8b060', 2, 6, 12, 1); R('#ff7ac0', 4, 7, 2, 1); R('#ff7ac0', 9, 7, 2, 1); R('#a8642a', 1, 13, 14, 1);
       R('#ffffff', 7, 2, 1, 3); R('#ffffff', 10, 3, 1, 2);
+      break;
+    case 'rod':
+      for (let k = 0; k < 12; k++) R(k % 4 === 0 ? '#3a2414' : '#7a5234', 2 + k, 14 - k, 1, 1);
+      R('#e8e8f0', 13, 2, 1, 9); R('#c43a3a', 12, 11, 3, 2); R('#ffffff', 12, 11, 3, 1); R('#aeb3b8', 4, 11, 2, 2);
+      break;
+    case 'boat':
+      R('#5a3a24', 1, 8, 14, 2); R('#8a5a34', 2, 10, 12, 2); R('#6a4428', 4, 12, 8, 1); R('#c4562a', 1, 7, 14, 1);
+      R('#aeb3b8', 7, 1, 1, 7); R('#f3e6dc', 8, 2, 4, 4); R('#d8c8b8', 8, 5, 3, 1);
+      break;
+    case 'cart':
+      R('#454a54', 2, 4, 12, 7); R('#7d838c', 2, 4, 12, 1); R('#5c6068', 3, 5, 10, 5); R('#e08a2c', 2, 7, 12, 1);
+      R('#1e1e22', 3, 11, 3, 3); R('#1e1e22', 10, 11, 3, 3); R('#8a8e96', 4, 12, 1, 1); R('#8a8e96', 11, 12, 1, 1);
+      break;
+    case 'oldcan':
+      R('#6a6e73', 5, 3, 6, 11); R('#9aa0a8', 5, 3, 6, 1); R('#8a3a2a', 5, 7, 6, 3); R('#4a4e53', 10, 4, 1, 9);
       break;
     default:
       R('#ff00ff', 0, 0, 16, 16);

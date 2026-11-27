@@ -36,6 +36,7 @@ import { initAudio, sfx, setVolume, setMusic, setMood, startMusic, restartMusic 
 import { createAdventure, MAX_HP, MAX_AIR, LAST_WAVE, STAGES, stageOf, DRAGONS, FINDS, RARE_OF } from './adventure.js';
 import { profile, loadProfile, saveProfile, note, wavesOn, waveMode, waveKey, WORLD_ORDER } from './profile.js';
 import { createFarm, MAX_FOOD } from './farm.js';
+import { createMachines } from './machines.js';
 import { STARS, starOf, fuelFor, canFly, UPGRADES, ENGINE_NAMES, TANK_SIZE, ENGINE_NEED } from './starmap.js';
 import { ENEMIES, BIG } from './enemies.js';
 import { placeRig, removeRig, rigAt, accrue, accrueAll, markSeen, rigSlots, rigCount, rigList, FREE_RIGS, RIG_SLOT_COINS, RIG_MINUTES, RIG_CAP, RIG_TREASURE, FIRST_LUCKY, nextFindIn, adsLeft, adBoost, boostLeft, AD_HOURS } from './rigs.js';
@@ -328,7 +329,7 @@ function icon(item) {
   if (!iconCache[item]) {
     const it = ITEMS[item];
     const bt = it.block && BLOCKS[it.block].tiles;
-    iconCache[item] = !it.block ? itemIcon(item) : BLOCKS[it.block].see ? flatIcon(typeof bt === 'string' ? bt : bt.side) : blockIcon(bt);
+    iconCache[item] = !it.block ? itemIcon(item) : BLOCKS[it.block].low ? flatIcon(bt.top) : BLOCKS[it.block].see ? flatIcon(typeof bt === 'string' ? bt : bt.side) : blockIcon(bt);
   }
   return iconCache[item];
 }
@@ -356,7 +357,7 @@ function toast(text, item) {
 function give(item, n = 1, quiet = false) {
   state.inv[item] = has(item) + n;
   if (!state.order.includes(item)) state.order.push(item);
-  if ((ITEMS[item].block || ITEMS[item].food || ITEMS[item].seed) && !state.hotbar.includes(item)) {
+  if ((ITEMS[item].block || ITEMS[item].food || ITEMS[item].seed || ITEMS[item].hold) && !state.hotbar.includes(item)) {
     const i = state.hotbar.indexOf(null);
     if (i >= 0) state.hotbar[i] = item;
   }
@@ -364,7 +365,7 @@ function give(item, n = 1, quiet = false) {
   renderHotbar();
 }
 function take(item, n = 1) {
-  if (creative() && ITEMS[item].block && state.inv[item] >= 999) return;
+  if (creative() && (ITEMS[item].block || ITEMS[item].hold) && state.inv[item] >= 999) return;
   state.inv[item] = has(item) - n;
   if (state.inv[item] <= 0) {
     delete state.inv[item];
@@ -559,7 +560,7 @@ function renderBag() {
   for (const k of owned) {
     const s = document.createElement('div'); s.className = 'slot'; s.title = ITEMS[k].name;
     s.innerHTML = `<img src="${icon(k)}" alt=""><span class="n">${creative() && has(k) >= 999 ? '∞' : has(k)}</span>`;
-    if (ITEMS[k].block || ITEMS[k].food || ITEMS[k].seed) { s.classList.add('can'); s.onclick = () => hold(k); }
+    if (ITEMS[k].block || ITEMS[k].food || ITEMS[k].seed || ITEMS[k].hold) { s.classList.add('can'); s.onclick = () => hold(k); }
     inv.appendChild(s);
   }
   if (owned.length) { const p = document.createElement('p'); p.className = 'sub tiny'; p.textContent = 'Tap a block or some food to hold it in the slot you picked.'; inv.appendChild(p); }
@@ -590,6 +591,7 @@ function renderBag() {
     if (r.after === 'won' && !state.won) continue;
     if (r.out === 'scanner' && profile.scanner) continue;
     if (r.out === 'rover' && profile.rover) continue;
+    if (r.once && ITEMS[r.out].hold && has(r.out)) continue;
     if (!state.won && ['forge', 'box', 'bed', 'airmaker'].includes(r.out) && !canMake(r)) continue;
     const row = document.createElement('div');
     row.className = 'recipe' + (ITEMS[r.out].part ? ' part' : '');
@@ -602,7 +604,7 @@ function renderBag() {
 }
 
 const NOT_IN_CREATIVE = new Set(['rig', 'trophy', 'flag']);
-const CREATIVE_BLOCKS = () => Object.keys(ITEMS).filter(k => ITEMS[k].block && !NOT_IN_CREATIVE.has(k) && !BLOCKS[ITEMS[k].block].ship);
+const CREATIVE_BLOCKS = () => Object.keys(ITEMS).filter(k => (ITEMS[k].hold || (ITEMS[k].block && !BLOCKS[ITEMS[k].block].ship)) && !NOT_IN_CREATIVE.has(k));
 // ---------------- ship ----------------
 function nearShip() { return camera.position.distanceTo(SHIP_CENTER) < 9; }
 function renderShip() {
@@ -681,6 +683,9 @@ const G = {
   diff, running: () => keys.has('ShiftLeft') || keys.has('ShiftRight') || (TOUCH && tch.move && Math.hypot(tch.jx, tch.jy) > 0.92),
   hardcore, creative, gameOver: (why) => gameOver(why), note: (thing) => note(look.planet.id, thing), homeLv: () => homeLv, maxHp: () => MAX_HP,
   heal: (n) => adv.heal(n), icon: (k) => icon(k),
+  creatures: () => adv.enemies.map(e => e.pos), waterLevel: () => (water ? water.level : null), addCoins: (n) => { profile.coins += n; saveProfile(); },
+  held: () => state.hotbar[state.sel], handPos: () => ({ x: player.pos.x - Math.sin(player.yaw) * 0.6 + Math.cos(player.yaw) * 0.35, y: player.pos.y + 1.3, z: player.pos.z - Math.cos(player.yaw) * 0.6 - Math.sin(player.yaw) * 0.35 }),
+  touch: TOUCH, splash: (x, y, z) => bits.burst(x - 0.5, y - 0.3, z - 0.5, [new THREE.Color(0x9ad8f0), new THREE.Color(0xffffff)]),
   track: (ev, n) => { if (creative()) return; if (quests) quests.track(ev, n); if (hooks) hooks.addXP(ev, n); if (ev === 'dragon') unlockSuit('dragon', 'You beat a dragon!'); },
   home: () => ({ at: !!state.flag && atHome(state, player.pos), lv: homeLv, flag: state.flag, inside: (x, z) => !!state.flag && Math.abs(x - state.flag.x - 0.5) <= HOME_R + 0.5 && Math.abs(z - state.flag.z - 0.5) <= HOME_R + 0.5 }),
 };
@@ -688,6 +693,7 @@ let homeLv = 0;
 let swingT = 0;
 const adv = createAdventure(G);
 const farm = createFarm(G);
+const mach = createMachines(G);
 
 function banner(title, sub) {
   const b = $('banner');
@@ -696,6 +702,7 @@ function banner(title, sub) {
   clearTimeout(banner.t); banner.t = setTimeout(() => b.classList.add('hide'), Math.min(7000, 3600 + (sub || '').length * 25));
 }
 function showFall(msg, lost) {
+  if (mach.riding()) mach.getOff();
   $('fallMsg').textContent = msg;
   $('fallSub').textContent = lost ? 'Your bag is where you fell. Go back and walk over it to get your things.' : 'You woke up safe.';
   openPanel('fallPanel');
@@ -1631,6 +1638,12 @@ function updateDig(dt) {
     if (creative()) world.set(hit.x, hit.y, hit.z, B.AIR); else farm.pickCrop(hit.x, hit.y, hit.z, hit.id, false);
     dig.on = false; dig.p = 0; crackBox.visible = false; writeSave(); return;
   }
+  if (dig.p >= 1 && BLOCKS[hit.id].power) mach.removed(hit.x, hit.y, hit.z);
+  if (dig.p >= 1 && BLOCKS[hit.id].low === undefined && BLOCKS[world.get(hit.x, hit.y + 1, hit.z)].low) {
+    // a wire or track on top falls off with the block under it
+    const up = world.get(hit.x, hit.y + 1, hit.z); world.set(hit.x, hit.y + 1, hit.z, B.AIR); mach.removed(hit.x, hit.y + 1, hit.z);
+    if (!creative() && BLOCKS[up].item) give(BLOCKS[up].item, 1, true);
+  }
   if (dig.p >= 1 && creative()) {
     world.set(hit.x, hit.y, hit.z, B.AIR);
     if (hit.id === B.SOIL) farm.soilGone(hit.x, hit.y, hit.z);
@@ -1674,6 +1687,13 @@ function openSupply() {
 }
 function useAction() {
   if (launchT >= 0) return;
+  if (mach.riding()) { mach.getOff(); return; }
+  { const h = state.hotbar[state.sel];
+    if (h && has(h) > 0 && ITEMS[h].hold && !(aim && aim.t < 4 && (!hit || aim.t < hit.t))) {
+      if (h === 'rod') { mach.useRod(rayO, fwd, hit); return; }
+      if (h === 'boat') { mach.startBoat(rayO, fwd); return; }
+      if (h === 'cart') { mach.startCart(hit); return; }
+    } }
   const fr = (inCamp || team) && friends.friendAt(rayO, fwd, rayT0 + 4);
   if (fr && rayT0) fr.t -= rayT0;
   if (fr && (!hit || fr.t < hit.t)) { openGift(fr.o); return; }
@@ -1700,6 +1720,7 @@ function useAction() {
   if (use === 'beacon' && creative()) { toast('No waves in Creative mode. Play in Survival or Hardcore to fight them.'); return; }
   if (use === 'beacon') { openPanel('beaconPanel'); return; }
   if (use === 'stove') { openPanel('stovePanel'); return; }
+  if (use === 'switch') { mach.toggleSwitch(hit); return; }
   if (use === 'forge') { openPanel('forgePanel'); return; }
   if (use === 'box') { openBox = `${hit.x},${hit.y},${hit.z}`; openPanel('boxPanel'); return; }
   if (use === 'rig' && creative()) { toast('Mining rigs only dig in Survival.'); return; }
@@ -1731,7 +1752,11 @@ function useAction() {
   if (inCamp && item === 'rig') { sfx.deny(); toast('Mining rigs only work on your own worlds.'); return; }
   if (item === 'rig' && creative()) { sfx.deny(); toast('Mining rigs only work in Survival.'); return; }
   if (item === 'rig' && rigCount() >= rigSlots()) { sfx.deny(); toast(`All ${rigSlots()} rig slots are in use. Open your bag to unlock another slot.`); return; }
-  world.set(x, y, z, ITEMS[item].block);
+  let pid = ITEMS[item].block;
+  if (BLOCKS[pid].track) { const fx = Math.abs(Math.sin(player.yaw)), fz = Math.abs(Math.cos(player.yaw)); if (fx > fz) pid = pid === B.TRACK ? B.TRACK_X : B.FAST_X; }
+  if (BLOCKS[pid].low && !BLOCKS[world.get(x, y - 1, z)].solid) { toast(`${ITEMS[item].name} has to lie on the ground.`); return; }
+  world.set(x, y, z, pid);
+  mach.placed(x, y, z, pid);
   take(item, 1);
   if (item === 'flag') {
     const moved = !!state.flag;
@@ -1785,7 +1810,7 @@ function frame(filmDt, noDraw) {
     jump: keys.has('Space'), run: keys.has('ShiftLeft') || keys.has('ShiftRight'), down: keys.has('KeyC'),
   } : { f: 0, r: 0, jump: false, run: false };
   if (playing) {
-    const ev = player.update(dt, input);
+    const ev = mach.riding() ? (mach.ride(dt, input), {}) : player.update(dt, input);
     updateGuide(dt, ev);
     updateRover(dt);
     if (ev.stepped) sfx.step();
@@ -1879,7 +1904,7 @@ function frame(filmDt, noDraw) {
 
   // light, sky, day and night, waves, finds
   adv.update(dt);
-  if (playing) { updateHome(dt); farm.update(dt); if (!creative() && !inCamp) farm.hungerTips(); }
+  if (playing) { updateHome(dt); farm.update(dt); mach.update(dt); if (!creative() && !inCamp) farm.hungerTips(); }
   sky.position.copy(camera.position);
   lavaSea.update(dt, camera.position);
   updateLooks(dt);
@@ -2594,6 +2619,7 @@ let roverM = null, roverLookNow = null;
 if (profile.rover) document.body.classList.add('hasrover');
 function toggleRover() {
   if (!playing || race.active || panelOpen()) return;
+  if (mach.riding()) { mach.getOff(); return; }
   if (!profile.rover) { toast(state.won ? 'Make a Rover in your bag first (E).' : 'Fix your ship first. Then you can make a Rover.'); return; }
   if (player.fly) return;
   player.rover = !player.rover;
@@ -2712,5 +2738,5 @@ window.__game = {
   pending: () => updateChunks(50), landOn, get look() { return look; },
   hit: () => hit, mouse, keys, tch, TOUCH, dig, useAction, renderGoal, get launchT() { return launchT; },
   adv, race, friends, get chat() { return chat; }, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, frame, stepNow, findNear, canMake, RECIPES, ITEMS, PARTS, nearShip, SHIP_CENTER, SHIP_BASE, get playing() { return playing; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; }, get treasures() { return treasures; }, sparkle, get digPh() { return digPh; }, renderForge, renderMap, finalSteps,
-  farm, get mode() { return mode; }, setMode: (m) => { mode = m; waveMode.s = m === 'hc' ? '_hc' : ''; renderWorlds(); }, realStart: () => start(), gameOver, renderBag, renderSettings, get gameIsOver() { return gameIsOver; }, B, BLOCKS,
+  farm, get mode() { return mode; }, setMode: (m) => { mode = m; waveMode.s = m === 'hc' ? '_hc' : ''; renderWorlds(); }, realStart: () => start(), mach, get water() { return water; }, gameOver, renderBag, renderSettings, get gameIsOver() { return gameIsOver; }, B, BLOCKS,
 };

@@ -351,3 +351,49 @@ export const COOK_RECIPES = [
   { out: 'salad', n: 1, need: { lettuce: 2, beans: 1 }, note: 'Fresh. Fills you up and gives you a little air.' },
   { out: 'pie', n: 1, need: { fruit: 2, potato: 1 }, note: 'The best meal there is. Fills you right up and heals a lot.' },
 ];
+// ---------------------------------------------------------------- wiring, tracks, fishing, boats (Version 29)
+// `low` = a thin block lying on the ground (height in blocks). You can walk over it.
+Object.assign(B, { SWITCH: 141, SWITCH_ON: 142, PLATE: 143, PLATE_ON: 144, WIRE: 145, WIRE_ON: 146, WLAMP: 147, WLAMP_ON: 148,
+  BLINKER: 149, BLINKER_ON: 150, TRACK: 151, TRACK_X: 152, FAST: 153, FAST_X: 154 });
+const thin = { solid: false, draw: true, see: true };
+def(B.SWITCH, { name: 'Switch', item: 'switch', tiles: { top: 'metal', side: 'switchOff', bottom: 'metal' }, time: 0.5, use: 'switch', power: 'source' });
+def(B.SWITCH_ON, { name: 'Switch (on)', item: 'switch', tiles: { top: 'metal', side: 'switchOn', bottom: 'metal' }, time: 0.5, use: 'switch', power: 'source' });
+def(B.PLATE, { name: 'Step plate', item: 'plate', tiles: { top: 'plate', side: 'plate', bottom: 'plate' }, time: 0.4, low: 0.09, power: 'source', ...thin });
+def(B.PLATE_ON, { name: 'Step plate (on)', item: 'plate', tiles: { top: 'plateOn', side: 'plateOn', bottom: 'plateOn' }, time: 0.4, low: 0.05, power: 'source', ...thin });
+def(B.WIRE, { name: 'Wire', item: 'wire', tiles: { top: 'wire', side: 'wire', bottom: 'wire' }, time: 0.2, low: 0.06, power: 'wire', ...thin });
+def(B.WIRE_ON, { name: 'Wire (on)', item: 'wire', tiles: { top: 'wireOn', side: 'wireOn', bottom: 'wireOn' }, time: 0.2, low: 0.06, power: 'wire', ...thin });
+def(B.WLAMP, { name: 'Wire lamp', item: 'wlamp', tiles: 'wlamp', time: 0.6, power: 'device' });
+def(B.WLAMP_ON, { name: 'Wire lamp (on)', item: 'wlamp', tiles: 'wlampOn', time: 0.6, power: 'device' });
+def(B.BLINKER, { name: 'Blinker', item: 'blinker', tiles: { top: 'blinker', side: 'blinker', bottom: 'metal' }, time: 0.6, power: 'source' });
+def(B.BLINKER_ON, { name: 'Blinker', item: 'blinker', tiles: { top: 'blinkerOn', side: 'blinkerOn', bottom: 'metal' }, time: 0.6, power: 'source' });
+def(B.TRACK, { name: 'Track', item: 'track', tiles: { top: 'track', side: 'trackSide', bottom: 'trackSide' }, time: 0.3, low: 0.08, track: 1, ...thin });
+def(B.TRACK_X, { name: 'Track', item: 'track', tiles: { top: 'trackX', side: 'trackSide', bottom: 'trackSide' }, time: 0.3, low: 0.08, track: 1, ...thin });
+def(B.FAST, { name: 'Fast track', item: 'fasttrack', tiles: { top: 'fast', side: 'trackSide', bottom: 'trackSide' }, time: 0.3, low: 0.08, track: 2, ...thin });
+def(B.FAST_X, { name: 'Fast track', item: 'fasttrack', tiles: { top: 'fastX', side: 'trackSide', bottom: 'trackSide' }, time: 0.3, low: 0.08, track: 2, ...thin });
+// doors and castle gates open when powered
+for (const id of [B.DOOR, B.DOOR_OPEN, B.GATE, B.GATE_OPEN]) BLOCKS[id].power = 'device';
+Object.assign(ITEMS, {
+  switch: { name: 'Switch', block: B.SWITCH },
+  plate: { name: 'Step plate', block: B.PLATE },
+  wire: { name: 'Wire', block: B.WIRE },
+  wlamp: { name: 'Wire lamp', block: B.WLAMP },
+  blinker: { name: 'Blinker', block: B.BLINKER },
+  track: { name: 'Track', block: B.TRACK },
+  fasttrack: { name: 'Fast track', block: B.FAST },
+  rod: { name: 'Fishing rod', hold: true },
+  boat: { name: 'Boat', hold: true },
+  cart: { name: 'Mine cart', hold: true },
+  oldcan: { name: 'Old can' },
+});
+RECIPES.push(
+  { out: 'wire', n: 8, need: { iron: 1, crystal: 1 }, note: 'Lay it on the ground to carry power from a Switch, Step plate or Blinker to doors, gates and Wire lamps.', after: 'won' },
+  { out: 'switch', n: 1, need: { sheet: 1, rock: 1 }, note: 'Use it to turn power on and off.', after: 'won' },
+  { out: 'plate', n: 2, need: { sheet: 1 }, note: 'Gives power while you (or a creature) stand on it. Good for doors that open by themselves, and traps.', after: 'won' },
+  { out: 'wlamp', n: 2, need: { crystal: 1, sheet: 1 }, note: 'A lamp that lights up when it gets power.', after: 'won' },
+  { out: 'blinker', n: 1, need: { crystal: 2, sheet: 1 }, note: 'Turns power on and off every second, all by itself.', after: 'won' },
+  { out: 'track', n: 8, need: { sheet: 1, rock: 2 }, note: 'Lay a line of track for a Mine cart. It can go up and down one block, and turn corners.', after: 'won' },
+  { out: 'fasttrack', n: 4, need: { sheet: 1, gold: 1 }, note: 'Pushes Mine carts along faster.', after: 'won' },
+  { out: 'cart', n: 1, need: { sheet: 4, iron: 2 }, note: 'Hold it and Use on a track to ride. Jump to get off.', after: 'won', once: true },
+  { out: 'rod', n: 1, need: { sheet: 1, crystal: 1 }, note: 'Fish in the sea, or through the ice on icy worlds. Use, wait for a bite, then Use again.', once: true },
+  { out: 'boat', n: 1, need: { metal: 4, sheet: 2 }, note: 'Hold it and Use on open water to sail. Jump to get off.', after: 'won', once: true },
+);

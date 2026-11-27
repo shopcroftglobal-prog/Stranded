@@ -247,3 +247,10 @@ Each new place is based on a real place on Mars:
   - Hardcore: one life, always Hard. If you fall the world (and its wave count) is gone and starts again. Coins and level stay.
 - **Difficulty** (Settings): Easy (half damage, air and food last longer, hunger never knocks you out, keep your bag), Normal, Hard (1.5x damage, faster air and food, hunger can knock you out).
 - Code: src/farm.js, crops/food/stove in src/blocks.js, plant drawing (`cross` blocks) in src/world.js. Tests: test/farm.js (add `phone`), test/farmshot.js.
+
+## Version 29: wiring, mine carts, fishing and boats
+- **Wiring** (bag, after the ship is fixed): Switch (Use to flip it), Step plate (on while you or a creature stands on it), Blinker (flips every second by itself), Wire (lay it on the ground; it glows red when it carries power, and runs up and down one step). Power reaches doors, castle gates and Wire lamps next to a powered wire or source. Doors and gates open, lamps light up, and they go back when the power stops. Up to 64 wires in a line.
+- **Mine carts**: lay Track (it lines up with the way you face) and Fast track (pushes the cart faster). Hold a Mine cart and Use on a track to ride. W (or push the pad up) to go, S to brake, Space/Jump (or Use) to get off; the cart goes back in your bag. It follows corners and goes up and down one block.
+- **Fishing rod**: Use on the sea (TRAPPIST-1e, LHS 1140 b, Blue world) or on the top of ice (Europa, Glass world). Wait for the bite, then Use again within about a second and a half. Raw fish, coins, seeds, sometimes a Gem or a golden fish, or an Old can.
+- **Boat**: hold it and Use on open water. W to sail, A/D to turn, Jump to step off onto the nearest land.
+- Code: src/machines.js, `low` blocks (thin, on the ground) in src/world.js. Test: test/machines.js (add `phone`).
