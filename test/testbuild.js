@@ -1,0 +1,33 @@
+// Public test build: no unlock, chat off, anonymous GoatCounter events, feedback form.
+const { chromium } = require('playwright');
+const path = require('path');
+(async () => {
+  const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  const errs = [], hits = [];
+  page.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
+  await page.route('**/*goatcounter.com/**', r => { const u = new URL(r.request().url()); hits.push(u.searchParams.get('p') + ' | ' + u.searchParams.get('t')); r.fulfill({ status: 200, body: '' }); });
+  await page.goto('file://' + path.resolve(__dirname, '../dist/test.html') + '?desktop&god&all&debug');
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('stranded-settings-v1', JSON.stringify({ quality: 'normal', sound: 0, music: 0 })); }); await page.reload(); await page.waitForTimeout(1500);
+  console.log('title', await page.title(), '| worlds unlocked by ?all:', await page.evaluate(() => Object.keys(__game.profile.visited).length));
+  await page.evaluate(() => document.getElementById('playBtn').click()); await page.waitForTimeout(1500);
+  await page.evaluate(() => { const g = __game; g.profile.guide = 9; g.closePanels(); g.start(); g.unlockAll(); });
+  console.log('after unlockAll: engine', await page.evaluate(() => [__game.profile.ship.engine, !!__game.profile.testAll, __game.state.won]));
+  await page.evaluate(() => { __game.openPanel('setPanel'); });
+  await page.waitForTimeout(300); await page.screenshot({ path: 'shots/test/settings.png' });
+  console.log('unlock button present:', await page.evaluate(() => !!document.querySelector('#setBody button[data-t], #setBody button[data-w]')));
+  await page.evaluate(() => { __game.closePanels(); __game.start(); });
+  await page.keyboard.press('KeyT'); await page.waitForTimeout(300);
+  console.log('chat panel open:', await page.evaluate(() => !document.getElementById('chatPanel').classList.contains('hide')), '| Say button shown:', await page.evaluate(() => getComputedStyle(document.getElementById('tChat')).display !== 'none'));
+  await page.evaluate(() => { const g = __game; g.state.fixed = { patch: true, engine: true, fueltank: false, computer: false, launch: false }; });
+  await page.waitForTimeout(10500);
+  await page.evaluate(() => { const g = __game; g.state.won = true; g.state.fixed = { patch: true, engine: true, fueltank: true, computer: true, launch: false }; g.profile.waves.mars = 5; });
+  await page.waitForTimeout(10500);
+  await page.evaluate(() => document.getElementById('fbOpen2') ? 0 : __game.openPanel('pause'));
+  await page.evaluate(() => document.getElementById('fbBtn').click()); await page.waitForTimeout(300);
+  await page.evaluate(() => { document.querySelectorAll('#fbStars button')[3].click(); document.getElementById('fbText').value = 'Fun digging, waves too hard. mail me at a@b.com'; });
+  await page.screenshot({ path: 'shots/test/feedback.png' });
+  await page.evaluate(() => document.getElementById('fbSend').click()); await page.waitForTimeout(500);
+  console.log('EVENTS\n' + hits.join('\n'));
+  console.log('ERR', errs.join('\n') || 'none'); await browser.close();
+})();

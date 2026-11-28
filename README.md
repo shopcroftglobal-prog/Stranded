@@ -274,3 +274,9 @@ Each new place is based on a real place on Mars:
 
 ## Version 33: unlock everything, updated
 - Settings (Esc, then Settings) > "Unlock everything" now also opens the three Andromeda worlds (fits the Galaxy drive), gives every suit, and gives enough minerals plus 2 Antimatter cells to try the whole final mission.
+
+## Public test build (dist/test.html)
+- `node build.mjs` also writes dist/test.html for itch.io. `GC=<code> node build.mjs` sets the GoatCounter site code (default stranded-game).
+- The test build has no Unlock everything or Jump to wave, ignores cheat switches in the link (?god, ?all, ?debug...), and has chat off.
+- It sends anonymous counts only (src/telemetry.js): new/returning visits by day, minutes per visit, progress steps, and the "Give feedback" stars and comment (contact details are hidden). No names, ids or cookies.
+- Test: test/testbuild.js. Post texts: game/playtest/posts.md.

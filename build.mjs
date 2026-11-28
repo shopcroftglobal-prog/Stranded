@@ -13,3 +13,8 @@ const art = html.replace(/<!doctype html>\s*/i, '').replace(/<html[^>]*>\s*/i, '
   .replace(/<body>\s*/i, '').replace(/<\/body>\s*/i, '').replace(/<\/html>\s*/i, '');
 fs.writeFileSync('dist/stranded.html', art);
 console.log('dist/stranded.html', (art.length / 1024).toFixed(0) + ' KB');
+// Public test build: no unlock button, chat off, anonymous counts to GoatCounter (code from GC, default stranded-game)
+const gc = (process.env.GC || 'stranded-game').replace(/[^a-z0-9-]/gi, '');
+const test = html.replace('<head>', () => `<head>\n<script>window.STRANDED_TEST = { gc: '${gc}' };</script>`).replace(/<title>[^<]*<\/title>/i, '<title>Stranded (early test)</title>');
+fs.writeFileSync('dist/test.html', test);
+console.log('dist/test.html', gc);

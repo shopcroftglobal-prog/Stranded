@@ -3,6 +3,7 @@ import * as rigsMod from './rigs.js';
 import { createRace } from './race.js';
 import { createFriends, PHRASES } from './friends.js';
 import { createChat } from './chat.js';
+import { TEST_BUILD, send as tmSend, once as tmOnce, visit as tmVisit, tick as tmTick } from './telemetry.js';
 import { makeRover, makePilot, animate, SUITS } from './characters.js';
 const LOOKS = { suit: { sand: 0, sea: 100, sun: 100, berry: 250, frost: 250, lime: 300, rust: 400, racing: 500,
   night: { gems: 3 }, glowline: { gems: 4 }, lava: { gems: 5 },
@@ -50,6 +51,8 @@ loadProfile();
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
+// the public test build ignores every cheat and testing switch in the link
+if (TEST_BUILD) for (const k of [...params.keys()]) if (!['touch', 'desktop', 'light'].includes(k)) params.delete(k);
 const LAST_KEY = 'stranded-last-world';
 // Mars keeps its step 1 save
 // Ways to play: Survival (normal), Creative (build freely) and Hardcore (one life). Each has its own save per world.
@@ -1380,7 +1383,7 @@ function renderBook() {
 
 // ---------------- panels and pointer lock ----------------
 let dragMode = false, lockFails = 0;
-const panels = ['signPanel', 'landPanel', 'villagePanel', 'brewPanel', 'stovePanel', 'prizePanel', 'teamPanel', 'setPanel', 'chatPanel', 'giftPanel', 'buildPanel', 'homePanel', 'adPanel', 'rigPanel', 'bag', 'shipPanel', 'pause', 'win', 'title', 'beaconPanel', 'forgePanel', 'boxPanel', 'shopPanel', 'mapPanel', 'bookPanel', 'fallPanel', 'rewardPanel', 'travel'];
+const panels = ['signPanel', 'landPanel', 'villagePanel', 'brewPanel', 'stovePanel', 'prizePanel', 'teamPanel', 'setPanel', 'chatPanel', 'giftPanel', 'buildPanel', 'homePanel', 'adPanel', 'rigPanel', 'bag', 'shipPanel', 'pause', 'win', 'title', 'beaconPanel', 'forgePanel', 'boxPanel', 'shopPanel', 'mapPanel', 'bookPanel', 'fallPanel', 'rewardPanel', 'travel', 'fbPanel'];
 const panelOpen = () => panels.some(id => !$(id).classList.contains('hide'));
 function requestLock() {
   if (dragMode) return;
@@ -1864,6 +1867,7 @@ function frame(filmDt, noDraw) {
   const dt = FILM ? (filmDt || 1 / 24) : Math.min(0.05, clock.getDelta());
   if (FILM) clock.elapsedTime += dt;
   if (chat) chat.update(dt);
+  tmTick(dt, playing);
   if (race.active) { race.frame(dt); nextFrame(); return; }
   if (playing && friends) friends.update(dt, clock.elapsedTime);
   if (pets) pets.update(playing && !panelOpen() ? dt : 0);
@@ -2297,6 +2301,7 @@ async function renderFriendsBox() {
   const wn = (w) => (w === 'camp' ? "in the Friends' camp" : w === 'title' ? 'on the title screen' : w === 'race' ? 'racing' : planetById(w) ? `on ${planetById(w).name}` : 'playing');
   $('friendsBox').innerHTML = !friends.connected ? '' : list.length ? `<b>Friends online (${list.length})</b>` + list.map(f => `<div>${f.name.replace(/[&<>]/g, '')} <span>${wn(f.w)}</span></div>`).join('') : '<b>Friends online</b><div><span>Nobody else right now.</span></div>';
 }
+if (TEST_BUILD) { chat.open = () => toast('Chat is off in this test version.'); chat.talk = () => { }; document.body.classList.add('testbuild'); }
 pets = createPets({ scene, player: () => player, world: () => world, give: (k, n) => give(k, n, true), addCoins: (n) => { profile.coins += n; saveProfile(); renderStatus(); }, fillAir: () => { state.air = MAX_AIR; }, toast: (t) => toast(t), sfx, hidden: () => !playing || race.active });
 const GOLDS = [0xffd54a, 0xfff3a0, 0xffb347, 0xffffff].map(c => new THREE.Color(c));
 hooks = createHooks({ give: (k, n) => give(k, n, true), toast: (t) => toast(t), banner: (a, b) => banner(a, b), sfx, ITEMS, icon,
@@ -2765,6 +2770,7 @@ function applySettings() {
 }
 // ---- for trying the game out: open every world and give the best gear
 function unlockAll() {
+  if (TEST_BUILD) return;
   profile.testAll = true;
   for (const id of WORLD_ORDER) profile.visited[id] = true;
   profile.ship = { tank: 2, engine: 4 };   // Galaxy drive: Andromeda worlds open too
@@ -2783,6 +2789,7 @@ function unlockAll() {
   banner('Everything unlocked!', 'All nine worlds (with the three in Andromeda), the Galaxy drive, every suit, the best sword and armour, the Rover, 5,000 coins, 12 fuel cells, and minerals to try the final mission forge. Fly anywhere from the ship\'s star map, or pick a world on the title screen.');
 }
 function jumpWave(n) {
+  if (TEST_BUILD) return;
   if (!state.won) unlockAll();
   profile.waves[look.planet.id] = Math.max(0, Math.min(LAST_WAVE - 1, n));
   saveProfile(); renderGoal();
@@ -2797,12 +2804,14 @@ function renderSettings() {
     + row('Sound effects', pct('sound')) + row('Music', pct('music'))
     + row('Picture', '<div>' + ['low', 'normal', 'high'].map(q => `<button class="${settings.quality === q ? 'on' : ''}" data-q="${q}">${{ low: 'Fast', normal: 'Normal', high: 'Far view' }[q]}</button>`).join('') + '</div>')
     + row(TOUCH ? 'Look speed' : 'Mouse speed', `<input type="range" min="30" max="250" value="${Math.round(settings.mouse * 100)}" data-k="mouse">`)
-    + `<h3 class="testh">Try everything</h3><p class="sub">For testing: opens all nine worlds, fixes your ship, fits the Galaxy drive and gives every suit and the best gear.</p>`
+    + (TEST_BUILD ? '' : `<h3 class="testh">Try everything</h3><p class="sub">For testing: opens all nine worlds, fixes your ship, fits the Galaxy drive and gives every suit and the best gear.</p>`
     + row('Unlock', `<div><button data-t="all">${profile.testAll ? 'Unlocked ✔ (give again)' : 'Unlock everything'}</button></div>`)
-    + row('Jump to wave', `<div>${[10, 20, 30, 40, 49].map(n => `<button data-w="${n}">${n === 49 ? 'Dragon (50)' : n + 1}</button>`).join('')}</div>`);
+    + row('Jump to wave', `<div>${[10, 20, 30, 40, 49].map(n => `<button data-w="${n}">${n === 49 ? 'Dragon (50)' : n + 1}</button>`).join('')}</div>`))
+    + (TEST_BUILD ? `<h3 class="testh">Tell us what you think</h3>` + row('Feedback', '<div><button id="fbOpen2">Give feedback</button></div>') : '');
   $('setBody').querySelectorAll('input').forEach(i => i.oninput = () => { const k = i.dataset.k, v = +i.value / 100; settings[k] = k === 'sound' ? v * 0.7 : v; applySettings(); saveSettings(); });
   $('setBody').querySelectorAll('button[data-q]').forEach(b => b.onclick = () => { settings.quality = b.dataset.q; applySettings(); saveSettings(); renderSettings(); });
-  $('setBody').querySelector('button[data-t]').onclick = () => { unlockAll(); renderSettings(); };
+  const ub = $('setBody').querySelector('button[data-t]'); if (ub) ub.onclick = () => { unlockAll(); renderSettings(); };
+  const fb2 = $('fbOpen2'); if (fb2) fb2.onclick = () => openFeedback();
   $('setBody').querySelectorAll('button[data-d]').forEach(b => b.onclick = () => { profile.diff = b.dataset.d; saveProfile(); renderSettings(); toast(`Difficulty: ${DIFF[profile.diff].name}`); });
   $('setBody').querySelectorAll('button[data-w]').forEach(b => b.onclick = () => { if (!playing) { toast('Land on a world first, then jump to a wave.'); return; } jumpWave(+b.dataset.w); closePanels(); });
 }
@@ -2827,3 +2836,38 @@ window.__game = {
   adv, race, friends, get chat() { return chat; }, enterCampMode, leaveCampMode, get inCamp() { return inCamp; }, rigs: rigsMod, get profile() { return profile; }, travel, flyTo, openSupply, get aim() { return aim; }, renderStatus, get quests() { return quests; }, get pets() { return pets; }, get team() { return team; }, frame, stepNow, findNear, canMake, RECIPES, ITEMS, PARTS, nearShip, SHIP_CENTER, SHIP_BASE, get playing() { return playing; }, get hooks() { return hooks; }, enterTeamMode, leaveTeamMode, myJobs, makeRover, unlockAll, jumpWave, toggleView, get behind() { return behind; }, get treasures() { return treasures; }, sparkle, get digPh() { return digPh; }, renderForge, renderMap, finalSteps,
   farm, get mode() { return mode; }, setMode: (m) => { mode = m; waveMode.s = m === 'hc' ? '_hc' : ''; renderWorlds(); }, realStart: () => start(), mach, vill, herd, drink, get hitNow() { return hit; }, get water() { return water; }, gameOver, renderBag, renderSettings, get gameIsOver() { return gameIsOver; }, B, BLOCKS,
 };
+
+// ---- public test build: anonymous progress counts and a feedback form
+function openFeedback() {
+  openPanel('fbPanel'); let stars = 0;
+  const draw = () => $('fbStars').querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', i < stars));
+  $('fbStars').querySelectorAll('button').forEach((b, i) => b.onclick = () => { stars = i + 1; draw(); $('fbSend').disabled = false; });
+  $('fbText').value = ''; $('fbSend').disabled = true; draw();
+  $('fbSend').onclick = () => {
+    const words = (chat ? chat.clean($('fbText').value) : $('fbText').value).replace(/\s+/g, ' ').trim().slice(0, 280);
+    tmSend(`feedback/stars-${stars}`, words || `${stars} stars, no comment`);
+    profile.fbSent = 1; saveProfile(); closePanels(); toast('Thank you! Your feedback was sent.');
+  };
+}
+$('fbClose').onclick = () => closePanels();
+$('fbBtn').onclick = () => openFeedback();
+if (TEST_BUILD) {
+  $('fbBtn').classList.remove('hide');
+  tmVisit('V33');
+  let asked = false, playedS = 0;
+  setInterval(() => {
+    if (!playing || !state || inCamp || race.active || profile.testAll) return;
+    playedS += 10;
+    const id = look.planet.id;
+    tmOnce('progress/1-started', 'Started playing');
+    const parts = PARTS.filter(p => state.fixed[p.id]).length;
+    for (let n = 1; n <= parts; n++) tmOnce(`progress/2-ship-part-${n}`, `Fixed ${n} of 4 ship parts`);
+    if (state.won) tmOnce('progress/3-ship-fixed', 'Ship fixed');
+    for (const w of [1, 5, 10, 20, 30, 40, 50]) if (wavesOn(id) >= w) tmOnce(`progress/4-wave-${w}`, `Cleared wave ${w} on any world`);
+    tmOnce(`world/${id}`, `Landed on ${look.planet.name}`);
+    if (Object.keys(profile.visited).length > 1) tmOnce('progress/5-left-first-world', 'Flew to a second world');
+    if (profile.final) tmOnce('progress/6-final-mission-started', 'Forged a final mission part');
+    if (profile.galaxyDone) tmOnce('progress/7-reached-andromeda', 'Reached Andromeda');
+    if (!asked && !profile.fbSent && playedS >= 15 * 60) { asked = true; toast('Enjoying the test? Press Esc and tap "Give feedback". It takes 10 seconds.'); }
+  }, 10000);
+}

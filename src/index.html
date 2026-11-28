@@ -339,6 +339,9 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
 #bookList .quest { grid-column: 1 / -1; }
 .quest.fin { grid-template-columns: auto 1fr; } .fic { width: 32px; height: 32px; image-rendering: pixelated; }
 .fhead { margin: 12px 0 4px; padding: 8px; border: 1px solid #8a9cff; background: rgba(60,70,140,0.25); display: grid; gap: 4px; } .fhead span { font-size: 12px; color: #d8e0ff; }
+#fbStars { display: flex; gap: 6px; justify-content: center; margin: 10px 0; } #fbStars button { font-size: 26px; padding: 2px 10px; color: #6a4a3a; } #fbStars button.on { color: #ffd54a; }
+#fbText { width: 100%; box-sizing: border-box; background: #1a0905; color: #f4e4d4; border: 1px solid #4a2416; padding: 8px; font: inherit; }
+body.testbuild #tChat, body.testbuild #chatFeed { display: none !important; }
 .swatch { display: inline-block; width: 22px; height: 22px; border: 2px solid #1a0905; }
 .quest.look { grid-template-columns: auto 1fr auto; }
 .quest.look.locked { opacity: 0.75; }
@@ -514,6 +517,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
       <button id="freeBtn2">Free roam: off</button>
       <button id="raceBtn2" class="racebtn">Star Kart racing</button>
       <button id="setBtn2">Settings</button>
+      <button id="fbBtn" class="hide">Give feedback</button>
     </div>
     <div class="keys desk-only">
       <b>Dig</b><span>Hold left click</span>
@@ -620,6 +624,13 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <div class="setrow"><span>Start a team</span><div><button id="teamNew">Start a new team on <span id="teamWorld"></span></button></div></div>
   <div class="setrow"><span>Join a team</span><div><input id="teamCode" maxlength="4" placeholder="Code" style="width:90px;text-transform:uppercase;font:inherit;padding:6px"> <button id="teamJoin">Join</button></div></div>
   <p class="sub" id="teamNote"></p>
+ </div></div>
+ <div id="fbPanel" class="overlay hide"><div class="dialog panel" style="width:min(440px,100%);text-align:center">
+  <h2>How do you like it?</h2>
+  <p class="sub">This is an early test. Your answer helps make the game better. Please don't write your name, email or phone number.</p>
+  <div id="fbStars"><button>★</button><button>★</button><button>★</button><button>★</button><button>★</button></div>
+  <textarea id="fbText" maxlength="280" rows="4" placeholder="What did you like? What was boring or confusing?"></textarea>
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:10px"><button id="fbSend" disabled>Send</button><button id="fbClose">Not now</button></div>
  </div></div>
  <div id="chatPanel" class="overlay hide"><div class="dialog panel" style="width:min(520px,100%)">
   <button class="close" data-close>Close (T)</button>
