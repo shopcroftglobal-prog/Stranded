@@ -24,8 +24,9 @@ export function createFriends(ctx) {
   let say = null, sayT = 0, lastSend = 0;
   const chatLog = [];
 
-  async function caps() {
-    if (tried) return;
+  let capsP = null;
+  function caps() { return capsP || (capsP = caps0()); }
+  async function caps0() {
     tried = true;
     const use = async (n) => { try { return window.claude ? await window.claude.use(n) : null; } catch (e) { return null; } };
     [room, user, db] = await Promise.all([use('room'), use('user'), use('db')]);
@@ -170,6 +171,7 @@ export function createFriends(ctx) {
     for (const p of ps) {
       const pr = p.presence || {};
       if (!Array.isArray(pr.p)) continue;
+      if (ctx.hidden && ctx.hidden(p.by || p.peer)) continue;     // blocked or muted: their pilot is not shown
       seen.add(p.peer);
       let o = others.get(p.peer);
       if (!o) {
@@ -184,7 +186,8 @@ export function createFriends(ctx) {
       o.target.set(+pr.p[0] || 0, +pr.p[1] || 0, +pr.p[2] || 0); o.yaw = +pr.p[3] || 0; o.moving = pr.mv ? 1 : 0;
       if (pr.say && pr.sayT && pr.sayT !== o.sayT && Date.now() - pr.sayT < 8000) {
         o.sayT = pr.sayT;
-        const text = String(pr.say).slice(0, 40);
+        const text = (ctx.clean ? ctx.clean(String(pr.say)) : String(pr.say)).slice(0, 40);
+        if (!text) continue;
         if (o.bubble) o.m.remove(o.bubble);
         o.bubble = tagSprite(text, '#ffffff'); o.bubble.position.y = 2.95; o.bubble.userData.t = 5; o.m.add(o.bubble);
         chatLog.push(`${o.name || 'A friend'}: ${text}`); if (chatLog.length > 5) chatLog.shift();
@@ -245,8 +248,23 @@ export function createFriends(ctx) {
     ctx.gotGift(String(d.item), n, from ? await nameOf(from) : 'A friend');
   }
 
+  // a chat message from someone standing in the camp: show it over their head too
+  function bubble(key, peer, text) {
+    for (const [, o] of others) {
+      if ((o.by || o.peer) !== key && o.peer !== peer) continue;
+      if (o.bubble) o.m.remove(o.bubble);
+      o.bubble = tagSprite(String(text).slice(0, 40), '#ffffff'); o.bubble.position.y = 2.95; o.bubble.userData.t = 5; o.m.add(o.bubble);
+    }
+  }
+  function posOf(key, peer) {
+    for (const [, o] of others) if ((o.by || o.peer) === key || o.peer === peer) return o.pos;
+    return null;
+  }
+
   return {
-    enterCamp, leaveCamp, blockChanged, update, chat, friendAt, sendGift, lobbyList, where, setInfo, team, nameOf,
+    caps, bubble, posOf, refresh: () => syncOthers(), nameOf,
+    get room() { return room; }, get user() { return user; }, get db() { return db; },
+    enterCamp, leaveCamp, blockChanged, update, chat, friendAt, sendGift, lobbyList, where, setInfo, team,
     get debug() { return { info: !!unsubInfo, chunks: !!unsubDb, cfg: { ...cfg, onInfo: !!cfg.onInfo }, CHUNKS, db: !!db, campOn }; },
     get on() { return campOn; }, get others() { return others; }, get connected() { return !!room; }, get canBuild() { return !!db; },
     chatLog,

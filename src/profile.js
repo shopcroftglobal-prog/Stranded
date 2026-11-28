@@ -20,6 +20,7 @@ const fresh = () => ({
   rigs: {},               // mining rigs on every world
   rigSlots: 0,            // rig slots bought on top of the free ones
   free: false,            // free roam: no air loss, no night creatures, you can fly
+  diff: 'normal',         // easy, normal or hard
 });
 
 export let profile = fresh();
@@ -45,4 +46,7 @@ export function note(world, thing) {
   b[thing] = true; saveProfile();
   return true;
 }
-export const wavesOn = (world) => profile.waves[world] || 0;
+// Hardcore worlds keep their own wave count, so losing one starts its waves over too.
+export const waveMode = { s: '' };
+export const waveKey = (world) => world + waveMode.s;
+export const wavesOn = (world) => profile.waves[waveKey(world)] || 0;

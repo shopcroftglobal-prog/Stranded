@@ -106,6 +106,10 @@ details.help summary { cursor: pointer; }
 .bag h4 { margin: 0 0 8px; color: #ffd7b0; font-weight: 400; font-size: 17px; }
 .inv { display: grid; grid-template-columns: repeat(auto-fill, 58px); gap: 4px; }
 .inv .slot { cursor: default; pointer-events: auto; }
+.signRow { display: flex; gap: 8px; } .signRow input { flex: 1; min-width: 0; font: inherit; font-size: 18px; padding: 8px 10px; background: #1c1410; color: #fff4dc; border: 2px solid #7d838c; }
+.landDlg { width: min(560px, 100%); } #landCanvas { display: block; width: min(512px, 100%, calc(100vh - 210px)); aspect-ratio: 1; margin: 6px auto; image-rendering: pixelated; border: 3px solid #4a4e56; }
+.landRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .landKey { font-size: 13px; opacity: 0.9; } .landKey i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 3px 0 8px; border: 1px solid #1c1410; }
+#mapBtnL { position: absolute; top: 124px; right: 12px; padding: 7px 12px; font-size: 14px; z-index: 6; pointer-events: auto; } .touch #mapBtnL { display: none; }
 .recipes { display: flex; flex-direction: column; gap: 6px; }
 .recipe { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; background: rgba(60,25,14,0.35); border: 1px solid #4a2416; }
 .recipe img { width: 40px; height: 40px; image-rendering: pixelated; }
@@ -188,10 +192,17 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
 }
 .touch #title .btns { position: sticky; bottom: -18px; margin: 10px -20px -18px; padding: 10px; background: #1a0c09; border-top: 1px solid var(--edge); z-index: 1; }
 /* ---------- adventure ---------- */
-#bars { position: absolute; top: 46px; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: auto 120px auto 120px; gap: 4px 8px; align-items: center; padding: 5px 10px; font-size: 13px; }
+#bars { position: absolute; top: 46px; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: auto 100px auto 100px auto 100px; gap: 4px 8px; align-items: center; padding: 5px 10px; font-size: 13px; }
 #bars .bar { height: 10px; background: #1a0905; border: 1px solid #4a2416; position: relative; }
 #bars .bar i { position: absolute; inset: 0; width: 100%; display: block; }
 #hpFill { background: #e0503a; } #hpFill.low { background: #ff2a1a; animation: blink 0.6s infinite; }
+#foodFill { background: #e8a23a; } #foodFill.low { background: #ff6a2a; animation: blink 0.6s infinite; }
+#fxTag { color: #9ad8ff; } #modeTag { font-weight: bold; } .mt-c { color: #7ae0a0; } .mt-h { color: #ff6a5a; } .mt-easy { color: #9ad0ff; } .mt-hard { color: #ffb060; }
+.slot.can { cursor: pointer; } .slot.can:hover { outline: 2px solid var(--ok); }
+.sub.tiny { font-size: 11px; grid-column: 1 / -1; margin: 4px 0 0; }
+#modeRow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 8px 0 2px; }
+#modeRow button.on { background: #2e6a4a; border-color: var(--ok); }
+#modeNote { margin: 2px 0 6px; }
 #airFill { background: #6ac8f0; } #airFill.low { background: #f0c24a; animation: blink 0.6s infinite; }
 @keyframes blink { 50% { opacity: 0.45 } }
 #bars .meta { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
@@ -300,7 +311,25 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
 .rres i { width: 14px; height: 14px; display: block; } .rres.me { background: rgba(255,208,96,0.15); color: #ffd060; }
 #race h3 { margin: 12px 0 6px; font-size: 16px; color: #ffd7b0; }
 .racebtn { background: linear-gradient(90deg, #4ab0f0, #9a5ae0); border-color: #c890ff; color: #fff; }
-#tChat { display: none; } .camp #tChat { display: block; }
+#tChat { display: none; } .camp #tChat, .chaton #tChat { display: block; }
+#chatFeed { position: absolute; left: 12px; bottom: 120px; font-size: 14px; background: rgba(26,9,5,0.6); padding: 6px 10px; width: min(380px, calc(100vw - 24px)); pointer-events: none; line-height: 1.35; }
+#chatFeed b, #chatHist b { color: #ffd060; font-weight: 400; } #chatFeed .me b, #chatHist .me b { color: #7dff9a; } #chatFeed i, #chatHist i { color: var(--muted); font-style: normal; font-size: 12px; }
+.touch #chatFeed { bottom: auto; top: calc(96px + env(safe-area-inset-top, 0px)); font-size: 12px; width: min(300px, 60vw); }
+#chatHist { height: min(220px, 34vh); overflow-y: auto; background: rgba(20,10,8,0.6); border: 1px solid #4a2416; padding: 6px 8px; margin-bottom: 8px; font-size: 14px; line-height: 1.4; -webkit-user-select: text; user-select: text; }
+.chatin { display: flex; gap: 6px; } .chatin input { flex: 1; min-width: 0; font: inherit; font-size: 16px; background: #1e0e08; color: #f4e2c8; border: 2px solid #8a3a1e; padding: 6px 8px; -webkit-user-select: text; user-select: text; }
+.chatin button { padding: 6px 12px; } #chatMic.on { background: #8a2a2a; border-color: #ff7070; animation: pulse 0.8s infinite alternate; }
+.chatnote { font-size: 12px; margin: 6px 0 10px !important; }
+.prow { border: 1px solid #4a2416; background: rgba(60,25,14,0.3); padding: 6px 8px; margin: 6px 0; display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
+.pname span { display: block; font-size: 12px; color: var(--muted); } .pbtns { display: flex; gap: 4px; } .pbtns button { padding: 3px 8px; font-size: 13px; }
+.pvol, .preport { grid-column: 1 / -1; font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; } .pvol input { flex: 1; }
+.preport b { width: 100%; color: #ffd7b0; font-weight: 400; } .preport button { padding: 3px 8px; font-size: 13px; }
+#voiceBar { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); display: flex; gap: 6px; pointer-events: none; z-index: 60; font-size: 13px; }
+#voiceBar span { background: rgba(26,9,5,0.75); border: 1px solid #4a2416; padding: 3px 9px; color: #f4e2c8; white-space: nowrap; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
+#voiceBar span.live { border-color: #7dff9a; color: #7dff9a; box-shadow: 0 0 8px rgba(125,255,154,0.4); }
+.touch #voiceBar { bottom: auto; top: calc(60px + env(safe-area-inset-top, 0px)); }
+#tTalk { display: none; left: calc(26px + env(safe-area-inset-left, 0px)); bottom: calc(260px + env(safe-area-inset-bottom, 0px)); width: 64px; height: 64px; font-size: 14px; }
+.voiceon #tTalk { display: grid; } #tTalk.on { background: rgba(40,150,80,0.9); border-color: #7dff9a; }
+@media (orientation: portrait) { #tTalk { bottom: calc(290px + env(safe-area-inset-bottom, 0px)); } }
 .campbtn { background: linear-gradient(90deg, #4ac060, #4ab0f0); border-color: #a0f0c0; color: #0a1a10; font-weight: 700; }
 #friendsBox { margin: 6px 0; font-size: 13px; } #friendsBox b { color: #7dff9a; } #friendsBox div { color: #f4e2c8; } #friendsBox span { color: var(--muted); }
 #chatLog { position: absolute; left: 12px; bottom: 120px; font-size: 14px; background: rgba(26,9,5,0.6); padding: 6px 10px; max-width: 320px; pointer-events: none; }
@@ -344,7 +373,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
 #travelText { font-size: 30px; color: #ffd7b0; text-align: center; line-height: 1.5; animation: bannerIn 2.4s forwards; }
 .world .lk { font-size: 11px; color: var(--muted); }
 #tScan { right: calc(108px + env(safe-area-inset-right, 0px)); bottom: calc(196px + env(safe-area-inset-bottom, 0px)); width: 58px; height: 58px; font-size: 13px; }
-.touch #bars { top: auto; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); grid-template-columns: auto 70px auto 70px; font-size: 11px; padding: 3px 7px; }
+.touch #bars { top: auto; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); grid-template-columns: auto 52px auto 52px auto 52px; gap: 3px 5px; font-size: 11px; padding: 3px 7px; }
 .touch #waveBox { top: calc(8px + env(safe-area-inset-top, 0px)); font-size: 14px; }
 .touch #lostBox { top: calc(44px + env(safe-area-inset-top, 0px)); }
 @media (orientation: portrait) { #tScan { bottom: calc(222px + env(safe-area-inset-bottom, 0px)); } .touch #bars { bottom: calc(52px + env(safe-area-inset-bottom, 0px)); } }
@@ -369,15 +398,17 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <div id="depth" class="panel"></div>
   <button id="upBtn" class="hide">⬆ Back to the top (U)</button>
   <button id="findBtn">Find ship (N)</button>
+  <button id="mapBtnL">Map (M)</button>
   <div id="mission" class="panel hide"></div>
   <div id="toasts"></div>
   <div id="hint"></div>
   <div id="chatLog" class="hide"></div>
+  <div id="chatFeed" class="hide"></div>
   <div id="guide" class="hide"></div>
   <div id="tool"></div>
   <div id="hotbar"></div>
-  <div id="bars" class="panel"><span>Health</span><div class="bar"><i id="hpFill"></i></div><span>Air</span><div class="bar"><i id="airFill"></i></div>
-    <div class="meta"><span id="daytime"></span><span id="coins"></span></div><div id="lvBox"><b id="lvNum">Lv 1</b><div class="xpbar"><div id="lvFill"></div></div><button id="prizeBtn" title="Prizes (R)">Prizes</button></div><div id="homeTag" class="hide"></div></div>
+  <div id="bars" class="panel"><span>Health</span><div class="bar"><i id="hpFill"></i></div><span>Air</span><div class="bar"><i id="airFill"></i></div><span>Food</span><div class="bar"><i id="foodFill"></i></div>
+    <div class="meta"><span id="daytime"></span><span id="fxTag"></span><span id="modeTag"></span><span id="coins"></span></div><div id="lvBox"><b id="lvNum">Lv 1</b><div class="xpbar"><div id="lvFill"></div></div><button id="prizeBtn" title="Prizes (R)">Prizes</button></div><div id="homeTag" class="hide"></div></div>
   <div id="waveBox" class="panel hide"></div>
   <div id="lostBox" class="panel hide"></div>
   <div id="banner" class="hide"></div>
@@ -391,9 +422,11 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <button class="tbtn" id="tPlace">Use</button>
   <button class="tbtn" id="tScan">Scan</button>
   <button class="tbtn" id="tRover">Drive</button>
-  <div id="tmenu"><button id="tBag">Bag</button><button id="tBook">Book</button><button id="tChat">Say</button><button id="tFly">Fly</button><button id="tView">View</button><button id="tPrize">Prizes</button><button id="tShop">Shop</button><button id="tShip" class="far">Ship</button><button id="tPause">II</button></div>
+  <button class="tbtn" id="tTalk">Talk</button>
+  <div id="tmenu"><button id="tBag">Bag</button><button id="tBook">Book</button><button id="tChat">Say</button><button id="tFly">Fly</button><button id="tView">View</button><button id="tPrize">Prizes</button><button id="tShop">Shop</button><button id="tMap">Map</button><button id="tShip" class="far">Ship</button><button id="tPause">II</button></div>
 </div>
 
+<div id="voiceBar" class="hide"></div>
 <div id="lockmsg" class="panel hide">Click to look around</div>
 
 <div id="title" class="overlay">
@@ -406,6 +439,8 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
       <div id="worlds"></div>
       <div id="facts"></div>
     </div>
+    <div id="modeRow"><span class="sub" style="margin:0">Way to play:</span><button data-mode="normal">Survival</button><button data-mode="creative">Creative</button><button data-mode="hc">Hardcore</button></div>
+    <p class="sub" id="modeNote"></p>
     <div class="btns">
       <button id="playBtn">Play</button>
       <button id="newBtn" class="hide">Start over</button>
@@ -422,6 +457,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
       <b>Place block</b><span>Tap Place. Tap a slot at the bottom to pick a block</span>
       <b>Bag and crafting</b><span>Bag, top right</span>
       <b>Ship repairs</b><span>Ship, when you're next to it</span>
+      <b>Chat with friends</b><span>Say, top right (when friends are online)</span>
       <b>Hit a creature</b><span>Hold Dig while aiming at it</span>
       <b>Use things</b><span>Aim at a beacon, Forge, box, bed or the Trader and tap Use</span>
       <b>Tip</b><span>Turn your phone sideways for more room</span>
@@ -438,6 +474,8 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
       <b>Hit a creature</b><span>Left click</span>
       <b>Scanner</b><span>Q</span>
       <b>Collection book</b><span>B</span>
+      <b>Chat with friends</b><span>T or Enter</span>
+      <b>Talk (when voice is on)</b><span>Hold Z</span>
       <b>Pause</b><span>Esc</span>
     </div></details>
   </div>
@@ -450,7 +488,7 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
     <p class="sub" id="bagTool"></p>
     <div class="bag">
       <div><h4>What you have</h4><div class="inv" id="inv"></div></div>
-      <div><h4>Make</h4><div class="recipes" id="recipes"></div></div>
+      <div><h4 id="makeHead">Make</h4><div class="recipes" id="recipes"></div></div>
     </div>
   </div>
 </div>
@@ -508,6 +546,37 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <p class="sub">Weapons and shields. You keep them on every world.</p>
   <div class="recipes" id="forgeList"></div>
 </div></div>
+<div id="villagePanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close</button>
+  <h2 id="villageTitle">Villager</h2>
+  <div id="villageBody"></div>
+</div></div>
+<div id="signPanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close</button>
+  <h2>Write on the sign</h2>
+  <p class="sub">Up to 40 letters. Everyone near the sign can read it. Rude words and links are hidden.</p>
+  <div class="signRow"><input id="signText" maxlength="40" autocomplete="off" placeholder="Like: Farm this way"><button id="signSave">Save</button></div>
+</div></div>
+<div id="landPanel" class="overlay hide"><div class="dialog panel landDlg">
+  <button class="close" data-close>Close</button>
+  <h2>Map</h2>
+  <p class="sub" id="landSub">The ground you have explored. North is up.</p>
+  <canvas id="landCanvas" width="256" height="256"></canvas>
+  <div class="landRow"><button id="landIn">Closer</button><button id="landOut">Further</button>
+  <span class="landKey"><i style="background:#fff"></i>You <i style="background:#ff7a4a"></i>Ship <i style="background:#8aff7a"></i>Home <i style="background:#7ad8ff"></i>Bed <i style="background:#ffc04a"></i>Village <i style="background:#e8dcc0"></i>Sign</span></div>
+</div></div>
+<div id="brewPanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close</button>
+  <h2>Potion table</h2>
+  <p class="sub">Each potion needs a Bottle (make them in your bag). Hold a potion and Use to drink it. You get the bottle back.</p>
+  <div class="recipes" id="brewList"></div>
+</div></div>
+<div id="stovePanel" class="overlay hide"><div class="dialog panel">
+  <button class="close" data-close>Close</button>
+  <h2>Camp stove</h2>
+  <p class="sub">Cooked food fills you up much more than raw food. Grow potatoes, beans and lettuce on Farm soil.</p>
+  <div class="recipes" id="stoveList"></div>
+</div></div>
 <div id="boxPanel" class="overlay hide"><div class="dialog panel">
   <button class="close" data-close>Close</button>
   <h2>Storage box</h2>
@@ -552,10 +621,20 @@ body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; 
   <div class="setrow"><span>Join a team</span><div><input id="teamCode" maxlength="4" placeholder="Code" style="width:90px;text-transform:uppercase;font:inherit;padding:6px"> <button id="teamJoin">Join</button></div></div>
   <p class="sub" id="teamNote"></p>
  </div></div>
- <div id="chatPanel" class="overlay hide"><div class="dialog panel" style="width:min(460px,100%)">
+ <div id="chatPanel" class="overlay hide"><div class="dialog panel" style="width:min(520px,100%)">
   <button class="close" data-close>Close (T)</button>
-  <h2>Say something</h2>
-  <div id="chatList" class="chatlist"></div>
+  <h2>Chat</h2>
+  <div id="chatTabs" class="tabs"><button data-ct="chat" class="on">Chat</button><button data-ct="people">Players</button><button data-ct="voice">Voice</button></div>
+  <div id="chatBody">
+   <div id="ct_chat">
+    <div id="chatHist"></div>
+    <div class="chatin"><input id="chatIn" maxlength="120" placeholder="Type a message, then Enter" autocomplete="off" enterkeyhint="send"><button id="chatMic" class="hide" title="Say it instead of typing">🎤</button><button id="chatSend">Send</button></div>
+    <p class="sub chatnote" id="chatNote"></p>
+    <div id="chatList" class="chatlist"></div>
+   </div>
+   <div id="ct_people" class="hide"></div>
+   <div id="ct_voice" class="hide"></div>
+  </div>
 </div></div>
  <div id="giftPanel" class="overlay hide"><div class="dialog panel" style="width:min(520px,100%)">
   <button class="close" data-close>Close</button>

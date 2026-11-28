@@ -225,3 +225,46 @@ Each new place is based on a real place on Mars:
   Glass world (blue-white star, blue crystal ground, Crystal dragon), Blue world (warm ocean world with beaches, Wave dragon), Ring world (desert under a giant ring, Gold dragon). From there the Milky Way hangs in the sky.
 - Arriving the first time: big celebration, +3000 coins and the Star traveller suit. Mars nights now show a faint Andromeda in the sky.
 - Test: test/final.js (forges every part, fits the drive, flies to all three new worlds).
+
+## Version 27: text chat and voice chat
+- Press T or Enter (Say button on phones, shown when friends are online) to open Chat. Type a message and press Enter, or tap a quick phrase. Everyone online sees it, with where they are ("on Mars", "Friends' camp"). Messages also pop up over a friend's pilot in the camp and team worlds. Code: src/chat.js.
+- Kept friendly (src/chatfilter.js): rude words (English, and common Urdu/Hindi ones in English letters, including tricks like sh1t, f u c k, fuuuck) become stars; links, emails, phone numbers and @handles become ***. It runs on what you send and on what you receive. No more than 5 messages in 10 seconds, no repeats.
+- Players tab: Mute (hides their chat and voice for now), Block (also hides their pilot, remembered on this device), Report (picks a reason; saved with their last messages in db `reports/<reporter id>`, which only the reporter and the owner/Editors can read; they are muted too).
+- Voice tab: voice is always off when the game starts. Turn it on, then hold Z (Talk button on phones) to talk, or pick Always on. Only players in the same place hear you. Nearby voice: in the Friends' camp and team worlds friends get quieter with distance and can't be heard past 48 blocks. Per-player volume in Players.
+  Voice goes straight between players (WebRTC, Google's free STUN); the room only carries the hand-shake (topic `rtc`).
+- The claude.ai page is not allowed to open the microphone, so there voice turns into "talk to type": hold Z and what you say becomes a chat message (🎤). You still hear friends whose device can talk. The 🎤 button in the chat box fills the text box by voice. Optional "Read chat out loud" uses Claude's voice.
+- Real voice everywhere (public website, phone app) needs a small online server; on hold until Maaz says go.
+- Artifact capabilities now also: room topics `chat` and `rtc` (Contributor), db rules `reports` (write self, read owner/Editors) + `reports/{self}`, `dictation`, `tts`.
+- Test: test/chat.js (two players: typing, filter both ways, spam guard, block, report, voice connect, push to talk, nearby fade, hang up).
+
+## Version 28: food, farming, cooking, Creative mode, Hardcore and difficulty
+- **Food**: a third bar next to Health and Air. It runs down over about 18 minutes (faster when you run or fight). You only heal when you have some food, and faster when you are full. At empty you slowly lose health. The first time you get hungry you find 4 potatoes and some bean seeds in the ship's food locker.
+- **Eating**: food goes in your hotbar. Hold it and Use (right click). Tap anything in the bag to hold it in the slot you picked.
+- **Farming**: make Farm soil in the bag (3 dust + 1 ice gives 4). Hold a potato, Bean seeds or Lettuce seeds and Use on top of the soil. Plants grow in 3 steps in about 4 minutes, twice as fast with ice or frost within 2 blocks (or next to a sea), even while you are away. Use a ripe plant to pick it and plant it again; dig it to just pick it. Seeds come from old supply boxes, the Trader and ripe plants. Each crop has a real fact.
+- **Cooking**: Camp stove (6 rock + 1 metal sheet). Baked potato, Cooked fish, Bean stew, Salad, Moss pie. Ice fish now give Raw fish.
+- **Ways to play** (title screen): Survival, Creative and Hardcore, each with its own save per world.
+  - Creative: every block in the bag, as many as you like, instant digging, flying, no danger, no hunger. No rewards, waves, rigs or trading there.
+  - Hardcore: one life, always Hard. If you fall the world (and its wave count) is gone and starts again. Coins and level stay.
+- **Difficulty** (Settings): Easy (half damage, air and food last longer, hunger never knocks you out, keep your bag), Normal, Hard (1.5x damage, faster air and food, hunger can knock you out).
+- Code: src/farm.js, crops/food/stove in src/blocks.js, plant drawing (`cross` blocks) in src/world.js. Tests: test/farm.js (add `phone`), test/farmshot.js.
+
+## Version 29: wiring, mine carts, fishing and boats
+- **Wiring** (bag, after the ship is fixed): Switch (Use to flip it), Step plate (on while you or a creature stands on it), Blinker (flips every second by itself), Wire (lay it on the ground; it glows red when it carries power, and runs up and down one step). Power reaches doors, castle gates and Wire lamps next to a powered wire or source. Doors and gates open, lamps light up, and they go back when the power stops. Up to 64 wires in a line.
+- **Mine carts**: lay Track (it lines up with the way you face) and Fast track (pushes the cart faster). Hold a Mine cart and Use on a track to ride. W (or push the pad up) to go, S to brake, Space/Jump (or Use) to get off; the cart goes back in your bag. It follows corners and goes up and down one block.
+- **Fishing rod**: Use on the sea (TRAPPIST-1e, LHS 1140 b, Blue world) or on the top of ice (Europa, Glass world). Wait for the bite, then Use again within about a second and a half. Raw fish, coins, seeds, sometimes a Gem or a golden fish, or an Old can.
+- **Boat**: hold it and Use on open water. W to sail, A/D to turn, Jump to step off onto the nearest land.
+- Code: src/machines.js, `low` blocks (thin, on the ground) in src/world.js. Test: test/machines.js (add `phone`).
+
+## Version 30: villages, potions, taming and breeding
+- **Villages**: small settlements of other stranded pilots, on every world. The first one on each world is a short walk north-east of the ship; more appear further out. Each has a well, lamp posts, a farm and four houses with a bed and a work block. A banner shows the village name the first time you find it.
+- **Villagers**: five per village, each with a job: Farmer, Cook, Smith, Potion maker, Miner. Use on a villager to trade (coins or goods). After 10 trades you are a friend of the village and coin prices are 10% lower.
+- **Potion table** (bag, needs Bottles made from Ice and Purple crystal): Healing, Speed, Jump, Strength, Air and Night potions. Hold a potion and Use to drink it; the bottle comes back. The running effect shows next to the bars.
+- **Taming**: hold a friendly creature's favourite food (e.g. Lettuce for hoppers and bunnies, Beans for crabs, Raw fish for jellies) and Use on it. It goes to live at your home (Home flag, else bed, else the ship). Up to 12.
+- **Breeding**: feed two tamed creatures of the same kind their favourite food within 30 seconds and a baby comes. It grows up in about 5 minutes. Grown-ups bring you small presents while you are home.
+- Code: src/villages.js, src/herd.js, potions in src/main.js (drink, updateFx). Test: test/village.js (add `phone`).
+
+## Version 31: signs, map and slingshot
+- **Sign** (bag: 1 Metal sheet makes 2): place it and write up to 40 letters on it. The words float above the sign for anyone near. Use it again to change the words. Rude words and links are hidden.
+- **Map** (M, or the Map button on phones): the ground you have explored on this world, seen from above, with you, the ship, your home, bed, villages you found and your signs. Closer/Further to zoom. The map is saved with the world and grows as you travel.
+- **Slingshot** (bag: 1 Metal sheet + 1 Iron, or from a village Smith): hold it and Use to shoot Rock at monsters from far away. Each shot uses 1 Rock.
+- Code: src/signs.js, src/landmap.js, src/sling.js. Test: test/signs.js (add `phone`).

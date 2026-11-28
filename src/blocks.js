@@ -300,3 +300,138 @@ export const recipeFor = (item) => {
   for (const f in FAMILY_ITEMS) if (FAMILY_ITEMS[f].some(([, it]) => it === item)) return { out: item, ...BUILD_COST[f] };
   return null;
 };
+// ---------------------------------------------------------------- farming and cooking (Version 28)
+// Crops grow on Farm soil. Each crop has 3 looks: just planted, growing, ripe.
+// `cross` = drawn as two crossing pictures, like a real plant.
+Object.assign(B, { SOIL: 130, STOVE: 131 });
+def(B.SOIL, { name: 'Farm soil', item: 'soil', tiles: { top: 'soilTop', side: 'soilSide', bottom: 'dust' }, time: 0.5 });
+def(B.STOVE, { name: 'Camp stove', item: 'stove', tiles: { top: 'stoveTop', side: 'stove', bottom: 'shipDark' }, time: 1.0, use: 'stove' });
+export const CROPS = {
+  potato: { name: 'Potato plant', seed: 'potato', crop: 'potato', n: [2, 4], fact: 'Real: scientists grew potatoes in soil like Mars soil in Peru, in a sealed box with Mars-like air.' },
+  bean: { name: 'Bean plant', seed: 'beanseed', crop: 'beans', n: [3, 5], fact: 'Real: beans add their own goodness to the soil, so they are a good first crop on a new world.' },
+  lettuce: { name: 'Lettuce plant', seed: 'lettuceseed', crop: 'lettuce', n: [1, 2], fact: 'Real: in 2015 astronauts on the space station ate red lettuce they grew there.' },
+};
+export const CROP_IDS = {};   // kind -> [3 block ids]
+{
+  let id = 132;
+  for (const k in CROPS) {
+    CROP_IDS[k] = [];
+    for (let s = 0; s < 3; s++) {
+      def(id, { name: s === 2 ? `${CROPS[k].name} (ripe)` : CROPS[k].name, tiles: `crop_${k}_${s}`, time: 0.15, solid: false, draw: true, see: true, cross: true, crop: { kind: k, stage: s } });
+      CROP_IDS[k].push(id++);
+    }
+  }
+}
+// `food` = how much it fills you up, `heal` = health it gives, `seed` = the crop it plants
+Object.assign(ITEMS, {
+  soil: { name: 'Farm soil', block: B.SOIL },
+  stove: { name: 'Camp stove', block: B.STOVE },
+  potato: { name: 'Potato', food: 3, seed: 'potato' },
+  beanseed: { name: 'Bean seeds', seed: 'bean' },
+  beans: { name: 'Beans', food: 2 },
+  lettuceseed: { name: 'Lettuce seeds', seed: 'lettuce' },
+  lettuce: { name: 'Lettuce', food: 3 },
+  rawfish: { name: 'Raw fish', food: 2 },
+  bakedpotato: { name: 'Baked potato', food: 7, heal: 2 },
+  stew: { name: 'Bean stew', food: 10, heal: 4 },
+  salad: { name: 'Salad', food: 8, heal: 3, air: 20 },
+  cookedfish: { name: 'Cooked fish', food: 9, heal: 4 },
+  pie: { name: 'Moss pie', food: 14, heal: 8 },
+});
+ITEMS.fruit.food = 5; ITEMS.fruit.heal = 6; ITEMS.fruit.air = 30;
+RECIPES.push(
+  { out: 'soil', n: 4, need: { dust: 3, ice: 1 }, note: 'Plant seeds or a potato on it. Ice close by makes plants grow twice as fast.' },
+  { out: 'stove', n: 1, need: { rock: 6, sheet: 1 }, note: 'Cook food on it. Cooked food fills you up much more.' },
+);
+// Cooked on the Camp stove
+export const COOK_RECIPES = [
+  { out: 'bakedpotato', n: 1, need: { potato: 1 }, note: 'Fills you up a lot more than a raw potato.' },
+  { out: 'cookedfish', n: 1, need: { rawfish: 1 }, note: 'A good hot meal.' },
+  { out: 'stew', n: 1, need: { beans: 3, ice: 1 }, note: 'Warm and filling. Heals you too.' },
+  { out: 'salad', n: 1, need: { lettuce: 2, beans: 1 }, note: 'Fresh. Fills you up and gives you a little air.' },
+  { out: 'pie', n: 1, need: { fruit: 2, potato: 1 }, note: 'The best meal there is. Fills you right up and heals a lot.' },
+];
+// ---------------------------------------------------------------- wiring, tracks, fishing, boats (Version 29)
+// `low` = a thin block lying on the ground (height in blocks). You can walk over it.
+Object.assign(B, { SWITCH: 141, SWITCH_ON: 142, PLATE: 143, PLATE_ON: 144, WIRE: 145, WIRE_ON: 146, WLAMP: 147, WLAMP_ON: 148,
+  BLINKER: 149, BLINKER_ON: 150, TRACK: 151, TRACK_X: 152, FAST: 153, FAST_X: 154 });
+const thin = { solid: false, draw: true, see: true };
+def(B.SWITCH, { name: 'Switch', item: 'switch', tiles: { top: 'metal', side: 'switchOff', bottom: 'metal' }, time: 0.5, use: 'switch', power: 'source' });
+def(B.SWITCH_ON, { name: 'Switch (on)', item: 'switch', tiles: { top: 'metal', side: 'switchOn', bottom: 'metal' }, time: 0.5, use: 'switch', power: 'source' });
+def(B.PLATE, { name: 'Step plate', item: 'plate', tiles: { top: 'plate', side: 'plate', bottom: 'plate' }, time: 0.4, low: 0.09, power: 'source', ...thin });
+def(B.PLATE_ON, { name: 'Step plate (on)', item: 'plate', tiles: { top: 'plateOn', side: 'plateOn', bottom: 'plateOn' }, time: 0.4, low: 0.05, power: 'source', ...thin });
+def(B.WIRE, { name: 'Wire', item: 'wire', tiles: { top: 'wire', side: 'wire', bottom: 'wire' }, time: 0.2, low: 0.06, power: 'wire', ...thin });
+def(B.WIRE_ON, { name: 'Wire (on)', item: 'wire', tiles: { top: 'wireOn', side: 'wireOn', bottom: 'wireOn' }, time: 0.2, low: 0.06, power: 'wire', ...thin });
+def(B.WLAMP, { name: 'Wire lamp', item: 'wlamp', tiles: 'wlamp', time: 0.6, power: 'device' });
+def(B.WLAMP_ON, { name: 'Wire lamp (on)', item: 'wlamp', tiles: 'wlampOn', time: 0.6, power: 'device' });
+def(B.BLINKER, { name: 'Blinker', item: 'blinker', tiles: { top: 'blinker', side: 'blinker', bottom: 'metal' }, time: 0.6, power: 'source' });
+def(B.BLINKER_ON, { name: 'Blinker', item: 'blinker', tiles: { top: 'blinkerOn', side: 'blinkerOn', bottom: 'metal' }, time: 0.6, power: 'source' });
+def(B.TRACK, { name: 'Track', item: 'track', tiles: { top: 'track', side: 'trackSide', bottom: 'trackSide' }, time: 0.3, low: 0.08, track: 1, ...thin });
+def(B.TRACK_X, { name: 'Track', item: 'track', tiles: { top: 'trackX', side: 'trackSide', bottom: 'trackSide' }, time: 0.3, low: 0.08, track: 1, ...thin });
+def(B.FAST, { name: 'Fast track', item: 'fasttrack', tiles: { top: 'fast', side: 'trackSide', bottom: 'trackSide' }, time: 0.3, low: 0.08, track: 2, ...thin });
+def(B.FAST_X, { name: 'Fast track', item: 'fasttrack', tiles: { top: 'fastX', side: 'trackSide', bottom: 'trackSide' }, time: 0.3, low: 0.08, track: 2, ...thin });
+// doors and castle gates open when powered
+for (const id of [B.DOOR, B.DOOR_OPEN, B.GATE, B.GATE_OPEN]) BLOCKS[id].power = 'device';
+Object.assign(ITEMS, {
+  switch: { name: 'Switch', block: B.SWITCH },
+  plate: { name: 'Step plate', block: B.PLATE },
+  wire: { name: 'Wire', block: B.WIRE },
+  wlamp: { name: 'Wire lamp', block: B.WLAMP },
+  blinker: { name: 'Blinker', block: B.BLINKER },
+  track: { name: 'Track', block: B.TRACK },
+  fasttrack: { name: 'Fast track', block: B.FAST },
+  rod: { name: 'Fishing rod', hold: true },
+  boat: { name: 'Boat', hold: true },
+  cart: { name: 'Mine cart', hold: true },
+  oldcan: { name: 'Old can' },
+});
+RECIPES.push(
+  { out: 'wire', n: 8, need: { iron: 1, crystal: 1 }, note: 'Lay it on the ground to carry power from a Switch, Step plate or Blinker to doors, gates and Wire lamps.', after: 'won' },
+  { out: 'switch', n: 1, need: { sheet: 1, rock: 1 }, note: 'Use it to turn power on and off.', after: 'won' },
+  { out: 'plate', n: 2, need: { sheet: 1 }, note: 'Gives power while you (or a creature) stand on it. Good for doors that open by themselves, and traps.', after: 'won' },
+  { out: 'wlamp', n: 2, need: { crystal: 1, sheet: 1 }, note: 'A lamp that lights up when it gets power.', after: 'won' },
+  { out: 'blinker', n: 1, need: { crystal: 2, sheet: 1 }, note: 'Turns power on and off every second, all by itself.', after: 'won' },
+  { out: 'track', n: 8, need: { sheet: 1, rock: 2 }, note: 'Lay a line of track for a Mine cart. It can go up and down one block, and turn corners.', after: 'won' },
+  { out: 'fasttrack', n: 4, need: { sheet: 1, gold: 1 }, note: 'Pushes Mine carts along faster.', after: 'won' },
+  { out: 'cart', n: 1, need: { sheet: 4, iron: 2 }, note: 'Hold it and Use on a track to ride. Jump to get off.', after: 'won', once: true },
+  { out: 'rod', n: 1, need: { sheet: 1, crystal: 1 }, note: 'Fish in the sea, or through the ice on icy worlds. Use, wait for a bite, then Use again.', once: true },
+  { out: 'boat', n: 1, need: { metal: 4, sheet: 2 }, note: 'Hold it and Use on open water to sail. Jump to get off.', after: 'won', once: true },
+);
+// ---------------------------------------------------------------- villages and potions (Version 30)
+B.BREW = 155;
+def(B.BREW, { name: 'Potion table', item: 'brew', tiles: { top: 'brewTop', side: 'brew', bottom: 'shipDark' }, time: 1.0, use: 'brew' });
+// `drink` = what a potion does, `secs` = for how long
+Object.assign(ITEMS, {
+  brew: { name: 'Potion table', block: B.BREW },
+  bottle: { name: 'Bottle' },
+  p_heal: { name: 'Healing potion', drink: 'heal', colour: '#ff5a7a' },
+  p_speed: { name: 'Speed potion', drink: 'speed', secs: 180, colour: '#7ad8ff' },
+  p_jump: { name: 'Jump potion', drink: 'jump', secs: 180, colour: '#8aff7a' },
+  p_strong: { name: 'Strength potion', drink: 'strong', secs: 180, colour: '#ff8a3a' },
+  p_air: { name: 'Air potion', drink: 'air', secs: 180, colour: '#e8f4ff' },
+  p_night: { name: 'Night sight potion', drink: 'night', secs: 240, colour: '#b07aff' },
+});
+RECIPES.push(
+  { out: 'bottle', n: 3, need: { ice: 2, crystal: 1 }, note: 'Empty bottles for potions.' },
+  { out: 'brew', n: 1, need: { sheet: 2, crystal: 2, ice: 2 }, note: 'Place it and use it to make potions.', after: 'won' },
+);
+export const FX_NAMES = { speed: 'Speed', jump: 'Jump', strong: 'Strength', air: 'Air', night: 'Night sight' };
+export const BREW_RECIPES = [
+  { out: 'p_heal', n: 1, need: { bottle: 1, fruit: 2 }, note: 'Heals you a lot, right away.' },
+  { out: 'p_speed', n: 1, need: { bottle: 1, beans: 3, crystal: 1 }, note: 'Walk and run half as fast again, for 3 minutes.' },
+  { out: 'p_jump', n: 1, need: { bottle: 1, lettuce: 2, crystal: 1 }, note: 'Jump much higher, for 3 minutes.' },
+  { out: 'p_strong', n: 1, need: { bottle: 1, potato: 2, gold: 1 }, note: 'Hit half as hard again, for 3 minutes.' },
+  { out: 'p_air', n: 1, need: { bottle: 1, ice: 4, crystal: 1 }, note: 'Your air does not run down, for 3 minutes.' },
+  { out: 'p_night', n: 1, need: { bottle: 1, rawfish: 2, crystal: 1 }, note: 'See in the dark, for 4 minutes.' },
+];
+// ---------------------------------------------------------------- signs and slingshot (Version 31)
+B.SIGN = 156;
+def(B.SIGN, { name: 'Sign', item: 'sign', tiles: { top: 'signTop', side: 'sign', bottom: 'signTop' }, time: 0.6, use: 'sign' });
+Object.assign(ITEMS, {
+  sign: { name: 'Sign', block: B.SIGN },
+  sling: { name: 'Slingshot', hold: true },
+});
+RECIPES.push(
+  { out: 'sign', n: 2, need: { sheet: 1 }, note: 'Place it, then write a few words on it. Everyone near it can read them.' },
+  { out: 'sling', n: 1, need: { sheet: 1, iron: 1 }, note: 'Hold it and Use to shoot Rock at monsters from far away. Each shot uses 1 Rock.', once: true },
+);
