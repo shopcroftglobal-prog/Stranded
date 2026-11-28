@@ -2767,15 +2767,20 @@ function applySettings() {
 function unlockAll() {
   profile.testAll = true;
   for (const id of WORLD_ORDER) profile.visited[id] = true;
-  profile.ship = { tank: 2, engine: 3 };
+  profile.ship = { tank: 2, engine: 4 };   // Galaxy drive: Andromeda worlds open too
+  profile.owned = profile.owned || {};
+  for (const k of Object.keys(LOOKS.suit)) profile.owned['suit_' + k] = 1;   // every suit
+  profile.finalIntro = 1;
   profile.gear.weapon = 'sunblade'; profile.gear.shield = 'shadowarmor';
   profile.rover = true; profile.scanner = Math.max(1, profile.scanner || 0);
   profile.coins += 5000; document.body.classList.add('hasrover');
   saveProfile();
   if (state && !state.won) { state.fixed = { patch: true, engine: true, fueltank: true, computer: true, launch: false }; state.won = true; state.arrived = true; world.setStructure(shipBlocks(state.fixed)); }
   give('fuelcell', 12, true); give('gem', 5, true); give('scale', 3, true);
+  // enough of each special mineral to try every final mission forge step
+  for (const [k, n] of Object.entries({ iron: 12, yellowstone: 3, glass: 6, sand: 8, salt: 6, ice: 12, blackrock: 8, gold: 4, crystal: 6, gem: 2, antimatter: 2 })) if (ITEMS[k]) give(k, n, true);
   renderWorlds(); renderGoal(); renderStatus(); renderHotbar(); writeSave();
-  banner('Everything unlocked!', 'All six worlds, the best sword and armour, the Rover, 5,000 coins and 12 fuel cells. Fly anywhere from the ship\'s star map, or pick a world on the title screen.');
+  banner('Everything unlocked!', 'All nine worlds (with the three in Andromeda), the Galaxy drive, every suit, the best sword and armour, the Rover, 5,000 coins, 12 fuel cells, and minerals to try the final mission forge. Fly anywhere from the ship\'s star map, or pick a world on the title screen.');
 }
 function jumpWave(n) {
   if (!state.won) unlockAll();
@@ -2792,7 +2797,7 @@ function renderSettings() {
     + row('Sound effects', pct('sound')) + row('Music', pct('music'))
     + row('Picture', '<div>' + ['low', 'normal', 'high'].map(q => `<button class="${settings.quality === q ? 'on' : ''}" data-q="${q}">${{ low: 'Fast', normal: 'Normal', high: 'Far view' }[q]}</button>`).join('') + '</div>')
     + row(TOUCH ? 'Look speed' : 'Mouse speed', `<input type="range" min="30" max="250" value="${Math.round(settings.mouse * 100)}" data-k="mouse">`)
-    + `<h3 class="testh">Try everything</h3><p class="sub">For testing: opens all six worlds, fixes your ship and gives the best gear.</p>`
+    + `<h3 class="testh">Try everything</h3><p class="sub">For testing: opens all nine worlds, fixes your ship, fits the Galaxy drive and gives every suit and the best gear.</p>`
     + row('Unlock', `<div><button data-t="all">${profile.testAll ? 'Unlocked ✔ (give again)' : 'Unlock everything'}</button></div>`)
     + row('Jump to wave', `<div>${[10, 20, 30, 40, 49].map(n => `<button data-w="${n}">${n === 49 ? 'Dragon (50)' : n + 1}</button>`).join('')}</div>`);
   $('setBody').querySelectorAll('input').forEach(i => i.oninput = () => { const k = i.dataset.k, v = +i.value / 100; settings[k] = k === 'sound' ? v * 0.7 : v; applySettings(); saveSettings(); });
